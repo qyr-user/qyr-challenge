@@ -13,6 +13,14 @@ export const authOptions: NextAuthOptions = {
       authorization: {
         params: { scope: 'read,activity:read_all', approval_prompt: 'auto' },
       },
+      profile(profile) {
+        return {
+          id: profile.id.toString(),
+          name: `${profile.firstname || ''} ${profile.lastname || ''}`.trim() || `Athlete ${profile.id}`,
+          email: `strava-${profile.id}@qyr-challenge.local`,
+          image: profile.profile || profile.profile_medium || null,
+        }
+      },
     }),
     ...(process.env.GOOGLE_CLIENT_ID
       ? [GoogleProvider({
