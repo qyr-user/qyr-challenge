@@ -1,19 +1,55 @@
 import { NextAuthOptions } from 'next-auth'
 import { PrismaAdapter } from '@auth/prisma-adapter'
-import StravaProvider from 'next-auth/providers/strava'
 import GoogleProvider from 'next-auth/providers/google'
 import { prisma } from './prisma'
+
+const STRAVA_AUTHORIZATION_URL = 'https://www.strava.com/oauth/authorize?response_type=code'
 
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma) as any,
   providers: [
-    StravaProvider({
-      clientId: process.env.STRAVA_CLIENT_ID!,
-      clientSecret: process.env.STRAVA_CLIENT_SECRET!,
+    {
+      id: 'strava',
+      name: 'Strava',
+      type: 'oauth',
       authorization: {
+        url: STRAVA_AUTHORIZATION_URL,
         params: { scope: 'read,activity:read_all', approval_prompt: 'auto' },
       },
-      profile(profile) {
+      // Strava nhúng athlete profile vào trong response token.
+      // Phải tách riêng ra, không để NextAuth ghi nguyên object đó vào bảng Account.
+      token: {
+        async request(context: any) {
+          const res = await fetch('https://www.strava.com/oauth/token', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              client_id: process.env.STRAVA_CLIENT_ID,
+              client_secret: process.env.STRAVA_CLIENT_SECRET,
+              code: context.params.code,
+              grant_type: 'authorization_code',
+            }),
+          })
+          const data = await res.json()
+          return {
+            tokens: {
+              access_token: data.access_token,
+              refresh_token: data.refresh_token,
+              expires_at: data.expires_at,
+              token_type: data.token_type || 'Bearer',
+              athlete: data.athlete, // chỉ giữ tạm trong memory, dùng ở profile() bên dưới
+            },
+          }
+        },
+      },
+      userinfo: {
+        async request(context: any) {
+          return context.tokens.athlete
+        },
+      },
+      clientId: process.env.STRAVA_CLIENT_ID!,
+      clientSecret: process.env.STRAVA_CLIENT_SECRET!,
+      profile(profile: any) {
         return {
           id: profile.id.toString(),
           name: `${profile.firstname || ''} ${profile.lastname || ''}`.trim() || `Athlete ${profile.id}`,
@@ -21,7 +57,7 @@ export const authOptions: NextAuthOptions = {
           image: profile.profile || profile.profile_medium || null,
         }
       },
-    }),
+    },
     ...(process.env.GOOGLE_CLIENT_ID
       ? [GoogleProvider({
           clientId: process.env.GOOGLE_CLIENT_ID!,
@@ -38,47 +74,43 @@ export const authOptions: NextAuthOptions = {
       }
       return session
     },
+  },
+  events: {
+    // Sự kiện này chạy SAU KHI User + Account đã được ghi vào DB
+    // (khác với callbacks.signIn chạy TRƯỚC khi ghi) → tránh lỗi FK violation.
     async signIn({ user, account, profile }) {
-      if (account?.provider === 'strava') {
-        try {
-          const existing = await prisma.stravaToken.findUnique({ where: { userId: user.id } })
-          const stravaProfile = profile as any
-          const athleteId = stravaProfile?.id?.toString() || account.providerAccountId
-          const athleteName = stravaProfile?.firstname
-            ? `${stravaProfile.firstname} ${stravaProfile.lastname || ''}`.trim()
-            : user.name || ''
-          const athletePhoto = stravaProfile?.profile || user.image || ''
+      if (account?.provider !== 'strava') return
+      try {
+        const stravaProfile = profile as any
+        const athleteId = stravaProfile?.id?.toString() || account.providerAccountId
+        const athleteName = stravaProfile?.firstname
+          ? `${stravaProfile.firstname} ${stravaProfile.lastname || ''}`.trim()
+          : user.name || ''
+        const athletePhoto = stravaProfile?.profile || user.image || ''
 
-          if (existing) {
-            await prisma.stravaToken.update({
-              where: { userId: user.id },
-              data: {
-                accessToken: account.access_token!,
-                refreshToken: account.refresh_token!,
-                expiresAt: account.expires_at!,
-                stravaAthleteId: athleteId,
-                athleteName,
-                athletePhoto,
-              },
-            })
-          } else {
-            await prisma.stravaToken.create({
-              data: {
-                userId: user.id,
-                stravaAthleteId: athleteId,
-                accessToken: account.access_token!,
-                refreshToken: account.refresh_token!,
-                expiresAt: account.expires_at!,
-                athleteName,
-                athletePhoto,
-              },
-            })
-          }
-        } catch (err) {
-          console.error('Error saving Strava token:', err)
-        }
+        await prisma.stravaToken.upsert({
+          where: { userId: user.id },
+          update: {
+            accessToken: account.access_token!,
+            refreshToken: account.refresh_token!,
+            expiresAt: account.expires_at!,
+            stravaAthleteId: athleteId,
+            athleteName,
+            athletePhoto,
+          },
+          create: {
+            userId: user.id,
+            stravaAthleteId: athleteId,
+            accessToken: account.access_token!,
+            refreshToken: account.refresh_token!,
+            expiresAt: account.expires_at!,
+            athleteName,
+            athletePhoto,
+          },
+        })
+      } catch (err) {
+        console.error('Error saving Strava token:', err)
       }
-      return true
     },
   },
   pages: { signIn: '/login', error: '/login' },
