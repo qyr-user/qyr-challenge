@@ -16,8 +16,6 @@ export const authOptions: NextAuthOptions = {
         url: STRAVA_AUTHORIZATION_URL,
         params: { scope: 'read,activity:read_all', approval_prompt: 'auto' },
       },
-      // Strava nhúng athlete profile vào trong response token.
-      // Phải tách riêng ra, không để NextAuth ghi nguyên object đó vào bảng Account.
       token: {
         async request(context: any) {
           const res = await fetch('https://www.strava.com/oauth/token', {
@@ -31,20 +29,26 @@ export const authOptions: NextAuthOptions = {
             }),
           })
           const data = await res.json()
+          // QUAN TRỌNG: KHÔNG đưa "athlete" vào object tokens này, vì NextAuth
+          // sẽ ghi toàn bộ object tokens vào bảng Account -> athlete gây lỗi
+          // "Unknown argument athlete". Athlete profile lấy riêng ở userinfo
+          // bên dưới bằng access_token.
           return {
             tokens: {
               access_token: data.access_token,
               refresh_token: data.refresh_token,
               expires_at: data.expires_at,
               token_type: data.token_type || 'Bearer',
-              athlete: data.athlete, // chỉ giữ tạm trong memory, dùng ở profile() bên dưới
             },
           }
         },
       },
       userinfo: {
         async request(context: any) {
-          return context.tokens.athlete
+          const res = await fetch('https://www.strava.com/api/v3/athlete', {
+            headers: { Authorization: `Bearer ${context.tokens.access_token}` },
+          })
+          return res.json()
         },
       },
       clientId: process.env.STRAVA_CLIENT_ID!,
@@ -76,8 +80,6 @@ export const authOptions: NextAuthOptions = {
     },
   },
   events: {
-    // Sự kiện này chạy SAU KHI User + Account đã được ghi vào DB
-    // (khác với callbacks.signIn chạy TRƯỚC khi ghi) → tránh lỗi FK violation.
     async signIn({ user, account, profile }) {
       if (account?.provider !== 'strava') return
       try {
