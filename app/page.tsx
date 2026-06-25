@@ -26,10 +26,12 @@ export default async function Home() {
     <div className="min-h-screen">
       <Navbar />
 
-      <section className="relative overflow-hidden py-20 px-4">
-        <div className="absolute inset-0 pointer-events-none">
-          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[400px] bg-orange-500/8 rounded-full blur-3xl" />
-        </div>
+      <section className="relative overflow-hidden py-32 px-4">
+        <div
+          className="absolute inset-0 bg-cover bg-center"
+          style={{ backgroundImage: "url('/bg.jpg')" }}
+        />
+        <div className="absolute inset-0 bg-zinc-950/75" />
         <div className="relative max-w-4xl mx-auto text-center">
           <div className="inline-flex items-center gap-2 bg-orange-500/10 border border-orange-500/20 rounded-full px-4 py-1.5 text-orange-400 text-sm font-medium mb-6">
             <Zap className="w-3.5 h-3.5" />
@@ -41,7 +43,7 @@ export default async function Home() {
             <span className="text-orange-500">NHAU NÀO</span>
           </h1>
           <p className="text-zinc-400 text-lg max-w-xl mx-auto mb-8">
-            Kết nối Strava, tham gia nhóm và cùng chinh phục những cột mốc chạy bộ với cộng đồng của bạn.
+            Kết nối Strava, tham gia nhóm và cùng chinh phục những cột mốc chạy bộ với cộng đồng QYR.
           </p>
           {!session && (
             <Link href="/login" className="btn-primary text-base px-8 py-3 inline-flex items-center gap-2">

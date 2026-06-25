@@ -13,11 +13,9 @@ export function Navbar() {
     <nav className="sticky top-0 z-50 border-b border-zinc-800/80 bg-zinc-950/90 backdrop-blur-md">
       <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
         <Link href="/" className="flex items-center gap-2 group">
-          <div className="w-8 h-8 bg-orange-500 rounded-lg flex items-center justify-center group-hover:bg-orange-400 transition-colors">
-            <Activity className="w-4 h-4 text-white" />
-          </div>
+          <Image src="/logo.png" alt="Club Logo" width={32} height={32} className="rounded-lg" />
           <span className="font-display text-xl tracking-wider text-zinc-100">
-            RUN<span className="text-orange-500">CHALLENGE</span>
+            Quảng Yên<span className="text-orange-500">Runner</span>
           </span>
         </Link>
 

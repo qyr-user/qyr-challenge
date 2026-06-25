@@ -8,8 +8,8 @@ const display = Bebas_Neue({ weight: '400', subsets: ['latin'], variable: '--fon
 const body = DM_Sans({ subsets: ['latin'], variable: '--font-body' })
 
 export const metadata: Metadata = {
-  title: 'RunChallenge — Thử thách chạy bộ',
-  description: 'Tham gia thử thách chạy bộ cộng đồng, kết nối Strava và theo dõi tiến trình của nhóm bạn.',
+  title: 'QYR — Thử thách chạy bộ',
+  description: 'Tham gia thử thách chạy bộ cùng QYR, kết nối Strava và theo dõi tiến trình của nhóm bạn.',
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
