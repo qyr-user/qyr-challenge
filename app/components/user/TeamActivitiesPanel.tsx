@@ -114,13 +114,16 @@ export function TeamActivitiesPanel({ teamId }: { teamId: string }) {
                       {formatDateTime(a.startDate)}
                     </td>
                     <td className="py-2">
-                      {a.isValid ? (
+                        {a.isValid ? (
                         <span className="badge-valid">✓ Hợp lệ</span>
-                      ) : (
-                        <span className="badge-invalid" title={a.invalidReason || ''}>
-                          ✗ Không hợp lệ
+                        ) : (
+                        <span className="tooltip-wrapper">
+                            <span className="badge-invalid cursor-help">✗ Không hợp lệ</span>
+                            {a.invalidReason && (
+                            <span className="tooltip-content">{a.invalidReason}</span>
+                            )}
                         </span>
-                      )}
+                        )}
                     </td>
                   </tr>
                 ))}

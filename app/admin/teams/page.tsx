@@ -178,7 +178,12 @@ export default function AdminTeamsPage() {
                                   {a.isValid ? (
                                     <span className="badge-valid">✓ Hợp lệ</span>
                                   ) : (
-                                    <span className="badge-invalid" title={a.invalidReason || ''}>✗ Không hợp lệ</span>
+                                    <span className="tooltip-wrapper">
+                                      <span className="badge-invalid cursor-help">✗ Không hợp lệ</span>
+                                      {a.invalidReason && (
+                                        <span className="tooltip-content">{a.invalidReason}</span>
+                                      )}
+                                    </span>
                                   )}
                                 </td>
                               </tr>

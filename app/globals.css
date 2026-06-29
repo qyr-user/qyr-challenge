@@ -45,6 +45,24 @@
            bg-red-500/15 text-red-400 border border-red-500/20;
   }
   .gradient-text { @apply bg-gradient-to-r from-orange-400 to-orange-600 bg-clip-text text-transparent; }
+   /* Tooltip cho badge "Không hợp lệ" */
+  .tooltip-wrapper {
+    @apply relative inline-flex;
+  }
+  .tooltip-content {
+    @apply invisible opacity-0 absolute z-50 bottom-full left-1/2 -translate-x-1/2 mb-2
+           bg-zinc-800 border border-zinc-700 text-zinc-200 text-xs rounded-lg px-3 py-2
+           whitespace-normal w-max max-w-[220px] shadow-lg shadow-black/30
+           transition-all duration-150 pointer-events-none;
+  }
+  .tooltip-wrapper:hover .tooltip-content {
+    @apply visible opacity-100;
+  }
+  .tooltip-content::after {
+    content: '';
+    @apply absolute top-full left-1/2 -translate-x-1/2 -mt-px
+           border-4 border-transparent border-t-zinc-700;
+  }
 }
 
 @layer utilities {
