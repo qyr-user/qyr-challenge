@@ -2,7 +2,7 @@
 import { signIn, useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { useEffect } from 'react'
-import { Activity } from 'lucide-react'
+import Image from 'next/image'
 
 export default function LoginPage() {
   const { data: session } = useSession()
@@ -20,14 +20,12 @@ export default function LoginPage() {
 
       <div className="relative z-10 w-full max-w-md">
         <div className="text-center mb-10">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-orange-500/20 rounded-2xl border border-orange-500/30 mb-4">
-            <Activity className="w-8 h-8 text-orange-400" />
-          </div>
+          <Image src="/logo.png" alt="Club Logo" width={64} height={64} className="rounded-lg" />
           <h1 className="font-display text-5xl tracking-widest mb-2">
-            RUN<span className="text-orange-500">CHALLENGE</span>
+            QuảngYên<span className="text-orange-500">Runner</span>
           </h1>
           <p className="text-zinc-400 text-sm">
-            Thử thách chạy bộ cộng đồng — Kết nối Strava để bắt đầu
+            Thử thách chạy bộ cộng đồng cùng QYR — Kết nối Strava để bắt đầu
           </p>
         </div>
 

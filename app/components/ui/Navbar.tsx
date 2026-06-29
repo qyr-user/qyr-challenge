@@ -15,7 +15,7 @@ export function Navbar() {
         <Link href="/" className="flex items-center gap-2 group">
           <Image src="/logo.png" alt="Club Logo" width={32} height={32} className="rounded-lg" />
           <span className="font-display text-xl tracking-wider text-zinc-100">
-            Quảng Yên<span className="text-orange-500">Runner</span>
+            QuảngYên<span className="text-orange-500">Runner</span>
           </span>
         </Link>
 
