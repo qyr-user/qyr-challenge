@@ -117,6 +117,11 @@ export default async function Home() {
           </div>
         )}
       </section>
+      <footer className="border-t border-zinc-800 py-6 text-center">
+        <Link href="/privacy" className="text-zinc-500 hover:text-zinc-300 text-sm transition-colors">
+          Chính sách bảo mật
+        </Link>
+      </footer>
     </div>
   )
 }
