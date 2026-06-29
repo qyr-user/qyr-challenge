@@ -1,6 +1,7 @@
 import { prisma } from '@/app/lib/prisma'
 import { notFound } from 'next/navigation'
 import { Navbar } from '@/app/components/ui/Navbar'
+import { LeaderboardList } from '@/app/components/user/LeaderboardList'
 import { formatDate } from '@/app/lib/utils'
 import { Calendar, Users, Trophy, Medal, Flame, ArrowLeft } from 'lucide-react'
 import Link from 'next/link'
@@ -57,13 +58,6 @@ export default async function ChallengePage({ params }: { params: { id: string }
   const now = new Date()
   const isActive = now >= challenge.startDate && now <= challenge.endDate
 
-  const rankIcons = ['🥇', '🥈', '🥉']
-  const medalColors = [
-    'border-yellow-500/40 bg-yellow-500/5',
-    'border-zinc-400/40 bg-zinc-400/5',
-    'border-orange-700/40 bg-orange-700/5',
-  ]
-
   return (
     <div className="min-h-screen">
       <Navbar />
@@ -110,6 +104,7 @@ export default async function ChallengePage({ params }: { params: { id: string }
           <div className="flex items-center gap-2 mb-6">
             <Trophy className="w-5 h-5 text-orange-500" />
             <h2 className="text-xl font-bold">Bảng xếp hạng</h2>
+            <span className="text-zinc-500 text-sm ml-2">(bấm vào 1 nhóm để xem chi tiết hoạt động)</span>
           </div>
 
           {leaderboard.length === 0 ? (
@@ -118,52 +113,7 @@ export default async function ChallengePage({ params }: { params: { id: string }
               <p className="text-zinc-500">Chưa có nhóm nào trong thử thách này.</p>
             </div>
           ) : (
-            <div className="space-y-4">
-              {leaderboard.map((team, i) => (
-                <div key={team.id} className={`card p-5 border transition-all ${i < 3 ? medalColors[i] : ''}`}>
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center gap-3">
-                      <span className="text-2xl w-8">{i < 3 ? rankIcons[i] : `#${team.rank}`}</span>
-                      <div>
-                        <h3 className="font-bold text-lg">{team.name}</h3>
-                        <p className="text-zinc-500 text-sm">{team.memberCount} thành viên</p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-display text-3xl text-orange-400">{team.totalKm.toFixed(1)}</p>
-                      <p className="text-zinc-500 text-sm">km</p>
-                    </div>
-                  </div>
-
-                  {leaderboard[0].totalKm > 0 && (
-                    <div className="mb-4">
-                      <div className="h-1.5 bg-zinc-800 rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-gradient-to-r from-orange-500 to-orange-400 rounded-full transition-all duration-1000"
-                          style={{ width: `${(team.totalKm / leaderboard[0].totalKm) * 100}%` }}
-                        />
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    {team.members.map(m => (
-                      <div key={m.userId} className="flex items-center gap-2 py-1">
-                        {m.photo ? (
-                          <img src={m.photo} alt="" className="w-7 h-7 rounded-full border border-zinc-700" />
-                        ) : (
-                          <div className="w-7 h-7 rounded-full bg-zinc-700 flex items-center justify-center text-xs text-zinc-400">
-                            {m.name[0]}
-                          </div>
-                        )}
-                        <span className="text-sm text-zinc-300 flex-1 truncate">{m.name}</span>
-                        <span className="text-sm font-mono text-orange-400">{m.totalKm.toFixed(1)}km</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
+            <LeaderboardList teams={leaderboard} />
           )}
         </div>
       </div>
