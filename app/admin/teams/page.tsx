@@ -4,6 +4,7 @@ import { Plus, Trash2, Users, Activity, ChevronDown, ChevronUp } from 'lucide-re
 import { toast } from 'sonner'
 import { useSearchParams } from 'next/navigation'
 import { formatDateTime } from '@/app/lib/utils'
+import { Tooltip } from '@/app/components/ui/Tooltip'
 
 interface Team { id: string; name: string; challengeId: string; _count: { members: number } }
 interface Challenge { id: string; name: string }
@@ -178,12 +179,9 @@ export default function AdminTeamsPage() {
                                   {a.isValid ? (
                                     <span className="badge-valid">✓ Hợp lệ</span>
                                   ) : (
-                                    <span className="tooltip-wrapper">
+                                    <Tooltip content={a.invalidReason || ''}>
                                       <span className="badge-invalid cursor-help">✗ Không hợp lệ</span>
-                                      {a.invalidReason && (
-                                        <span className="tooltip-content">{a.invalidReason}</span>
-                                      )}
-                                    </span>
+                                    </Tooltip>
                                   )}
                                 </td>
                               </tr>

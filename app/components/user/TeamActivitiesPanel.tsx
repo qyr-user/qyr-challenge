@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react'
 import { formatDateTime } from '@/app/lib/utils'
+import { Tooltip } from '@/app/components/ui/Tooltip'
 
 interface Activity {
   id: string
@@ -115,14 +116,11 @@ export function TeamActivitiesPanel({ teamId }: { teamId: string }) {
                     </td>
                     <td className="py-2">
                         {a.isValid ? (
-                        <span className="badge-valid">✓ Hợp lệ</span>
+                          <span className="badge-valid">✓ Hợp lệ</span>
                         ) : (
-                        <span className="tooltip-wrapper">
+                          <Tooltip content={a.invalidReason || ''}>
                             <span className="badge-invalid cursor-help">✗ Không hợp lệ</span>
-                            {a.invalidReason && (
-                            <span className="tooltip-content">{a.invalidReason}</span>
-                            )}
-                        </span>
+                          </Tooltip>
                         )}
                     </td>
                   </tr>
