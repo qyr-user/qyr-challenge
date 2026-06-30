@@ -1,13 +1,18 @@
-import prisma from '@/app/lib/prisma'
+'use client'
+import { useEffect, useState } from 'react'
 import { AlertTriangle } from 'lucide-react'
 
-export async function StravaSessionBanner() {
-  try {
-    const setting = await prisma.appSetting.findUnique({ where: { key: 'strava_session_valid' } })
-    if (!setting || setting.value !== 'false') return null
-  } catch {
-    return null
-  }
+export function StravaSessionBanner() {
+  const [expired, setExpired] = useState(false)
+
+  useEffect(() => {
+    fetch('/api/session-status')
+      .then(r => r.json())
+      .then(d => setExpired(d.expired === true))
+      .catch(() => {})
+  }, [])
+
+  if (!expired) return null
 
   return (
     <div className="w-full bg-amber-500/10 border-b border-amber-500/30 px-4 py-2 flex items-center justify-center gap-2 text-amber-400 text-sm">

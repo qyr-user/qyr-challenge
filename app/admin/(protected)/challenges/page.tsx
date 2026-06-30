@@ -20,6 +20,21 @@ const defaultForm = {
   maxKmPerActivity: '', minPaceStr: '', maxPaceStr: '',
 }
 
+// Convert UTC ISO string → "YYYY-MM-DDTHH:mm" in UTC+7 for datetime-local input
+function toVNLocal(isoStr: string): string {
+  const d = new Date(isoStr)
+  // offset +7h
+  const vn = new Date(d.getTime() + 7 * 60 * 60 * 1000)
+  return vn.toISOString().slice(0, 16)
+}
+
+// Convert datetime-local value (treated as UTC+7) → ISO UTC string for API
+function fromVNLocal(localStr: string): string {
+  if (!localStr) return ''
+  const d = new Date(localStr + ':00+07:00')
+  return d.toISOString()
+}
+
 function paceToSeconds(pace: string): number | undefined {
   if (!pace) return undefined
   const [m, s] = pace.split(':').map(Number)
@@ -51,7 +66,7 @@ export default function AdminChallengesPage() {
     setEditId(c.id)
     setForm({
       name: c.name, description: c.description || '',
-      startDate: c.startDate.slice(0, 16), endDate: c.endDate.slice(0, 16),
+      startDate: toVNLocal(c.startDate), endDate: toVNLocal(c.endDate),
       stravaClubId: c.stravaClubId || '',
       maxActivitiesPerDay: c.maxActivitiesPerDay?.toString() || '',
       minActivitiesPerDay: c.minActivitiesPerDay?.toString() || '',
@@ -67,7 +82,13 @@ export default function AdminChallengesPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setLoading(true)
-    const payload = { ...form, minPaceSeconds: paceToSeconds(form.minPaceStr), maxPaceSeconds: paceToSeconds(form.maxPaceStr) }
+    const payload = {
+      ...form,
+      startDate: fromVNLocal(form.startDate),
+      endDate: fromVNLocal(form.endDate),
+      minPaceSeconds: paceToSeconds(form.minPaceStr),
+      maxPaceSeconds: paceToSeconds(form.maxPaceStr),
+    }
     try {
       const res = await fetch(editId ? `/api/challenges/${editId}` : '/api/challenges', {
         method: editId ? 'PATCH' : 'POST',

@@ -3,7 +3,7 @@ import Link from 'next/link'
 import { Calendar, Users, Trophy, ArrowRight, Activity, Zap } from 'lucide-react'
 import { formatDate } from './lib/utils'
 
-export const revalidate = 60
+export const dynamic = 'force-dynamic'
 
 export default async function Home() {
   const challenges = await prisma.challenge.findMany({

@@ -5,7 +5,7 @@ import { formatDate } from '@/app/lib/utils'
 import { Calendar, Users, Trophy, Medal, Flame, ArrowLeft } from 'lucide-react'
 import Link from 'next/link'
 
-export const revalidate = 300
+export const dynamic = 'force-dynamic'
 
 async function getLeaderboard(challengeId: number) {
   const teams = await prisma.team.findMany({
@@ -42,6 +42,7 @@ export default async function ChallengePage({ params }: { params: { id: string }
   const leaderboard = await getLeaderboard(Number(params.id))
   const now = new Date()
   const isActive = now >= challenge.startDate && now <= challenge.endDate
+  const isUpcoming = now < challenge.startDate
 
   return (
     <div className="min-h-screen">
@@ -58,9 +59,11 @@ export default async function ChallengePage({ params }: { params: { id: string }
                 <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${
                   isActive
                     ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/20'
+                    : isUpcoming
+                    ? 'bg-blue-500/15 text-blue-400 border border-blue-500/20'
                     : 'bg-zinc-500/15 text-zinc-400 border border-zinc-500/20'
                 }`}>
-                  {isActive ? '🟢 Đang diễn ra' : '⚫ Đã kết thúc'}
+                  {isActive ? '🟢 Đang diễn ra' : isUpcoming ? '🔵 Sắp diễn ra' : '⚫ Đã kết thúc'}
                 </span>
               </div>
               <h1 className="font-display text-4xl tracking-wider text-orange-400 mb-2">{challenge.name}</h1>

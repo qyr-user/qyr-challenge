@@ -12,8 +12,8 @@ export async function POST(req: NextRequest) {
   const result = await runScrapeForChallenge(Number(challengeId))
 
   if (!result.success) {
-    return NextResponse.json({ error: result.error, sessionExpired: result.sessionExpired }, { status: 400 })
+    return NextResponse.json({ error: result.error, sessionExpired: result.sessionExpired, debug: result.debug }, { status: 400 })
   }
 
-  return NextResponse.json({ ok: true, newActivities: result.newActivities })
+  return NextResponse.json({ ok: true, newActivities: result.newActivities, debug: result.debug })
 }

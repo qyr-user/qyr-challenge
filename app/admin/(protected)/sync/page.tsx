@@ -15,6 +15,7 @@ export default function AdminSyncPage() {
   const [syncing, setSyncing] = useState<number | null>(null)
   const [lastSync, setLastSync] = useState<Record<number, string>>({})
   const [results, setResults] = useState<Record<number, string>>({})
+  const [debugLogs, setDebugLogs] = useState<Record<number, string[]>>({})
 
   useEffect(() => { fetch('/api/challenges').then(r => r.json()).then(setChallenges) }, [])
 
@@ -27,6 +28,7 @@ export default function AdminSyncPage() {
         body: JSON.stringify({ challengeId }),
       })
       const data = await res.json()
+      if (data.debug) setDebugLogs(p => ({ ...p, [challengeId]: data.debug }))
       if (!res.ok) {
         toast.error(data.error || 'Cào dữ liệu thất bại')
         setResults(p => ({ ...p, [challengeId]: `Lỗi: ${data.error}` }))
@@ -88,7 +90,11 @@ export default function AdminSyncPage() {
                         </span>
                       )}
                     </div>
-                    {results[c.id] && <p className="text-xs text-emerald-400 mt-1">{results[c.id]}</p>}
+                    {results[c.id] && (
+                      <p className={`text-xs mt-1 ${results[c.id].startsWith('Lỗi') ? 'text-red-400' : 'text-emerald-400'}`}>
+                        {results[c.id]}
+                      </p>
+                    )}
                   </div>
                 </div>
                 <button
@@ -101,6 +107,14 @@ export default function AdminSyncPage() {
                   {isSyncing ? 'Đang cào...' : 'Cào ngay'}
                 </button>
               </div>
+                {debugLogs[c.id] && (
+                <div className="mt-3 border-t border-zinc-800 pt-3">
+                  <p className="text-xs text-zinc-500 mb-1 font-mono">Debug log:</p>
+                  <pre className="bg-zinc-900 rounded p-3 text-xs text-zinc-400 font-mono overflow-x-auto max-h-60 overflow-y-auto whitespace-pre-wrap">
+                    {debugLogs[c.id].join('\n')}
+                  </pre>
+                </div>
+              )}
             </div>
           )
         })}

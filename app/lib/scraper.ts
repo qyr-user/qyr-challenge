@@ -45,9 +45,12 @@ function calculatePaceSeconds(distanceKm: number, durationSeconds: number): numb
 export async function scrapeStravaClubToday(
   sessionCookie: string,
   clubId: string
-): Promise<{ activities: ScrapedActivity[]; sessionExpired: boolean }> {
+): Promise<{ activities: ScrapedActivity[]; sessionExpired: boolean; debug: string[] }> {
+  const logs: string[] = []
   const url = `https://www.strava.com/clubs/${clubId}/recent_activity`
   let html: string
+
+  logs.push(`[scrape] Fetching: ${url}`)
 
   try {
     const res = await fetch(url, {
@@ -58,34 +61,72 @@ export async function scrapeStravaClubToday(
         Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
         'Accept-Language': 'vi-VN,vi;q=0.9,en-US;q=0.8,en;q=0.7',
         'Cache-Control': 'no-cache',
+        Referer: 'https://www.strava.com/',
       },
       redirect: 'follow',
     })
 
+    logs.push(`[scrape] HTTP ${res.status}, final URL: ${res.url}`)
+
     const finalUrl = res.url
     if (finalUrl.includes('/login') || finalUrl.includes('athletes/login')) {
-      return { activities: [], sessionExpired: true }
+      logs.push('[scrape] Redirected to login → session expired')
+      return { activities: [], sessionExpired: true, debug: logs }
     }
 
+    // Collect all cookies from response to use in subsequent requests
+    const setCookieHeader = res.headers.get('set-cookie') || ''
+    const responseCookies = setCookieHeader
+      .split(',')
+      .map(c => c.split(';')[0].trim())
+      .filter(Boolean)
+      .join('; ')
+    logs.push(`[scrape] Response Set-Cookie count: ${setCookieHeader ? setCookieHeader.split(',').length : 0}`)
+
     html = await res.text()
+    logs.push(`[scrape] HTML length: ${html.length} chars`)
 
     if (
       (html.includes('Log In') && html.includes("Don't have an account")) ||
       html.includes('login-btn') ||
       html.includes('/athletes/login')
     ) {
-      return { activities: [], sessionExpired: true }
+      logs.push('[scrape] Login page detected in HTML → session expired')
+      return { activities: [], sessionExpired: true, debug: logs }
     }
-  } catch {
-    return { activities: [], sessionExpired: false }
+
+    // Tìm embedded JSON data trong HTML (Strava có thể nhúng sẵn feed data)
+    const bootstrapMatch = html.match(/bootstrap_data\s*=\s*({.{0,2000}})/)
+    const stravaPropsMatch = html.match(/window\.__strava[A-Z]\w*\s*=\s*({.{0,500}})/)
+    const pagePropsMatch = html.match(/"pageProps"\s*:\s*({.{0,500}})/)
+    logs.push(`[scrape] Has bootstrap_data: ${!!bootstrapMatch}`)
+    logs.push(`[scrape] Has window.__strava*: ${!!stravaPropsMatch}`)
+    logs.push(`[scrape] Has pageProps: ${!!pagePropsMatch}`)
+
+    // Kiểm tra xem HTML có chứa feed data không
+    const hasTestId = html.includes('data-testid="entry-header"')
+    const hasFeedEntry = html.includes('web-feed-entry') || html.includes('feed-entry-')
+    logs.push(`[scrape] Has data-testid="entry-header": ${hasTestId}`)
+    logs.push(`[scrape] Has feed-entry: ${hasFeedEntry}`)
+
+    if (!hasTestId && !hasFeedEntry) {
+      // Strava renders feed via JS — static fetch gets empty shell
+      // Try the JSON feed endpoint with CSRF token + response cookies
+      logs.push('[scrape] No feed HTML found — trying JSON feed endpoint...')
+      return await scrapeViaJsonFeed(sessionCookie, clubId, logs, html, responseCookies)
+    }
+  } catch (err) {
+    logs.push(`[scrape] Fetch error: ${err}`)
+    return { activities: [], sessionExpired: false, debug: logs }
   }
 
   const $ = cheerio.load(html)
   const activities: ScrapedActivity[] = []
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
 
-  $('[data-testid="entry-header"]').each((_, headerEl) => {
+  const entryHeaders = $('[data-testid="entry-header"]')
+  logs.push(`[scrape] Found ${entryHeaders.length} entry-header elements`)
+
+  entryHeaders.each((_, headerEl) => {
     try {
       const parentEntry = $(headerEl).closest('[data-testid="web-feed-entry"], [id^="feed-entry-"]')
       if (!parentEntry.length) return
@@ -93,9 +134,11 @@ export async function scrapeStravaClubToday(
       const timeEl = parentEntry.find('time[data-testid="date_at_time"]')
       if (!timeEl.length) return
       const timeText = timeEl.text().trim().toLowerCase()
+      logs.push(`[scrape] Entry time text: "${timeText}"`)
       if (!timeText.includes('hôm nay') && !timeText.includes('today')) return
 
       const athleteName = $(headerEl).find('[data-testid="owners-name"]').text().trim()
+      logs.push(`[scrape] Athlete name: "${athleteName}"`)
       if (!athleteName || athleteName.toLowerCase() === 'hồ sơ') return
 
       let statsContainer = $(headerEl).closest('li')
@@ -105,7 +148,6 @@ export async function scrapeStravaClubToday(
       if (!activityName) activityName = parentEntry.find('[data-testid="activity_name"]').text().trim()
       if (!activityName) activityName = 'Running'
 
-      // Distance
       let distanceStr = '0 km'
       statsContainer.find('span').each((_, el) => {
         const text = $(el).text().trim()
@@ -115,7 +157,6 @@ export async function scrapeStravaClubToday(
         }
       })
 
-      // Duration
       let durationStr = ''
       statsContainer.find('span').each((_, el) => {
         const text = $(el).text().trim()
@@ -125,7 +166,6 @@ export async function scrapeStravaClubToday(
         }
       })
 
-      // Pace
       let paceStr = ''
       statsContainer.find('span').each((_, el) => {
         const text = $(el).text().trim()
@@ -142,6 +182,8 @@ export async function scrapeStravaClubToday(
         paceSeconds = calculatePaceSeconds(distanceKm, movingTime)
       }
 
+      logs.push(`[scrape] ✓ Activity: ${athleteName} | ${activityName} | ${distanceKm}km`)
+
       activities.push({
         athleteName,
         activityName,
@@ -150,12 +192,147 @@ export async function scrapeStravaClubToday(
         paceSeconds,
         activityDate: new Date(),
       })
-    } catch {
-      // skip bad entries
+    } catch (err) {
+      logs.push(`[scrape] Entry parse error: ${err}`)
     }
   })
 
-  return { activities, sessionExpired: false }
+  logs.push(`[scrape] Total activities parsed: ${activities.length}`)
+  return { activities, sessionExpired: false, debug: logs }
+}
+
+async function scrapeViaJsonFeed(
+  sessionCookie: string,
+  clubId: string,
+  logs: string[],
+  mainHtml?: string,
+  responseCookies?: string
+): Promise<{ activities: ScrapedActivity[]; sessionExpired: boolean; debug: string[] }> {
+  // Extract CSRF token from main page HTML
+  let csrfToken = ''
+  const htmlToParse = mainHtml || ''
+  const csrfMatch = htmlToParse.match(/<meta[^>]+name=["']csrf-token["'][^>]+content=["']([^"']+)["']/)
+    || htmlToParse.match(/content=["']([^"']+)["'][^>]+name=["']csrf-token["']/)
+    || htmlToParse.match(/"csrfToken"\s*:\s*"([^"]+)"/)
+    || htmlToParse.match(/csrf.token['"]\s*[,:]\s*['"]([^'"]+)['"]/)
+  if (csrfMatch) {
+    csrfToken = csrfMatch[1]
+    logs.push(`[json-feed] Found CSRF token: ${csrfToken.slice(0, 20)}...`)
+  } else {
+    logs.push('[json-feed] No CSRF token found in HTML')
+  }
+
+  const before = Math.floor(Date.now() / 1000)
+  const feedUrl = `https://www.strava.com/clubs/${clubId}/feed?feed_type=club&athlete_id=&before=${before}&cursor=`
+  logs.push(`[json-feed] Trying: ${feedUrl}`)
+  logs.push(`[json-feed] CSRF token present: ${!!csrfToken}`)
+
+  try {
+    const cookieStr = responseCookies
+      ? `_strava4_session=${sessionCookie}; ${responseCookies}`
+      : `_strava4_session=${sessionCookie}`
+    const feedHeaders: Record<string, string> = {
+      Cookie: cookieStr,
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124.0.0.0 Safari/537.36',
+      Accept: 'text/javascript, application/javascript, application/ecmascript, application/x-ecmascript, */*; q=0.01',
+      'X-Requested-With': 'XMLHttpRequest',
+      Referer: `https://www.strava.com/clubs/${clubId}/recent_activity`,
+    }
+    if (csrfToken) {
+      feedHeaders['X-CSRF-Token'] = csrfToken
+    }
+    const res = await fetch(feedUrl, { headers: feedHeaders })
+
+    logs.push(`[json-feed] HTTP ${res.status}`)
+
+    if (res.status === 401 || res.status === 302) {
+      return { activities: [], sessionExpired: true, debug: logs }
+    }
+
+    const text = await res.text()
+    logs.push(`[json-feed] Response length: ${text.length} chars`)
+    logs.push(`[json-feed] First 500 chars: ${text.slice(0, 500)}`)
+
+    // Response có thể là JSON (entries array) hoặc HTML partial
+    let json: { entries?: unknown[]; pagination?: unknown } | null = null
+    try {
+      json = JSON.parse(text)
+      logs.push(`[json-feed] Parsed as JSON, keys: ${Object.keys(json!).join(', ')}`)
+    } catch {
+      // Not JSON
+    }
+
+    const activities: ScrapedActivity[] = []
+
+    if (json && Array.isArray(json.entries)) {
+      logs.push(`[json-feed] entries count: ${json.entries.length}`)
+      if (json.entries.length === 0) {
+        logs.push('[json-feed] No entries — possibly need page scroll or different before timestamp')
+        return { activities: [], sessionExpired: false, debug: logs }
+      }
+
+      // Mỗi entry là HTML string cần parse bằng cheerio
+      for (const entry of json.entries) {
+        try {
+          const entryHtml = typeof entry === 'string' ? entry : (entry as { html?: string })?.html || ''
+          if (!entryHtml) {
+            logs.push(`[json-feed] entry type: ${typeof entry}, keys: ${typeof entry === 'object' ? Object.keys(entry as object).join(',') : 'n/a'}`)
+            continue
+          }
+          const $e = cheerio.load(entryHtml)
+
+          const timeText = $e('time[data-testid="date_at_time"]').text().trim().toLowerCase()
+          logs.push(`[json-feed] entry time: "${timeText}"`)
+          if (!timeText.includes('hôm nay') && !timeText.includes('today')) continue
+
+          const athleteName = $e('[data-testid="owners-name"]').first().text().trim()
+          if (!athleteName) continue
+
+          const activityName = $e('[data-testid="activity_name"]').first().text().trim() || 'Running'
+
+          let distanceStr = '0 km'
+          $e('span').each((_, el) => {
+            const t = $e(el).text().trim()
+            if (t === 'Quãng đường' || t === 'Distance') {
+              const v = $e(el).next('div').text().trim()
+              if (v) distanceStr = v
+            }
+          })
+
+          let durationStr = ''
+          $e('span').each((_, el) => {
+            const t = $e(el).text().trim()
+            if (['Thời gian', 'Time', 'Moving Time', 'Elapsed Time'].includes(t)) {
+              const v = $e(el).next('div').text().trim()
+              if (v) durationStr = v
+            }
+          })
+
+          const distanceKm = parseDistanceKm(distanceStr)
+          const movingTime = parseDurationToSeconds(durationStr)
+          const paceSeconds = distanceKm > 0 && movingTime > 0 ? calculatePaceSeconds(distanceKm, movingTime) : null
+
+          logs.push(`[json-feed] ✓ ${athleteName} | ${activityName} | ${distanceKm}km`)
+          activities.push({ athleteName, activityName, distanceKm, movingTime, paceSeconds, activityDate: new Date() })
+        } catch (err) {
+          logs.push(`[json-feed] entry parse error: ${err}`)
+        }
+      }
+
+      logs.push(`[json-feed] Total: ${activities.length}`)
+      return { activities, sessionExpired: false, debug: logs }
+    }
+
+    // Fallback: parse as HTML partial
+    const $ = cheerio.load(text)
+    const entryHeaders = $('[data-testid="entry-header"]')
+    logs.push(`[json-feed] Fallback HTML parse: ${entryHeaders.length} entry-headers found`)
+    logs.push('[json-feed] Feed likely requires full JS rendering (Selenium/Puppeteer needed)')
+    return { activities: [], sessionExpired: false, debug: logs }
+  } catch (err) {
+    logs.push(`[json-feed] Error: ${err}`)
+    return { activities: [], sessionExpired: false, debug: logs }
+  }
 }
 
 export function validateActivityAgainstChallenge(
@@ -196,31 +373,38 @@ export async function runScrapeForChallenge(challengeId: number): Promise<{
   newActivities: number
   sessionExpired: boolean
   error?: string
+  debug?: string[]
 }> {
+  const runLogs: string[] = []
   try {
     const challenge = await prisma.challenge.findUnique({ where: { id: challengeId } })
     if (!challenge) return { success: false, newActivities: 0, sessionExpired: false, error: 'Không tìm thấy challenge' }
 
+    runLogs.push(`[run] Challenge: "${challenge.name}", startDate: ${challenge.startDate}, endDate: ${challenge.endDate}`)
+
     const now = new Date()
+    runLogs.push(`[run] Now: ${now.toISOString()}`)
+
     if (now < challenge.startDate || now > challenge.endDate) {
-      return { success: false, newActivities: 0, sessionExpired: false, error: 'Challenge không đang diễn ra' }
+      return { success: false, newActivities: 0, sessionExpired: false, error: 'Challenge không đang diễn ra', debug: runLogs }
     }
 
     if (!challenge.stravaClubId) {
-      return { success: false, newActivities: 0, sessionExpired: false, error: 'Chưa cấu hình Strava Club ID' }
+      return { success: false, newActivities: 0, sessionExpired: false, error: 'Chưa cấu hình Strava Club ID', debug: runLogs }
     }
 
     const sessionSetting = await prisma.appSetting.findUnique({ where: { key: 'strava_session' } })
     if (!sessionSetting?.value) {
-      return { success: false, newActivities: 0, sessionExpired: false, error: 'Chưa cấu hình Strava Session Cookie' }
+      return { success: false, newActivities: 0, sessionExpired: false, error: 'Chưa cấu hình Strava Session Cookie', debug: runLogs }
     }
+    runLogs.push(`[run] Session cookie present (length: ${sessionSetting.value.length})`)
 
-    const { activities, sessionExpired } = await scrapeStravaClubToday(
+    const { activities, sessionExpired, debug: scrapeLogs } = await scrapeStravaClubToday(
       sessionSetting.value,
       challenge.stravaClubId
     )
+    const allLogs = [...runLogs, ...scrapeLogs]
 
-    // Update session validity
     await prisma.appSetting.upsert({
       where: { key: 'strava_session_valid' },
       update: { value: sessionExpired ? 'false' : 'true' },
@@ -228,15 +412,17 @@ export async function runScrapeForChallenge(challengeId: number): Promise<{
     })
 
     if (sessionExpired) {
-      return { success: false, newActivities: 0, sessionExpired: true, error: 'Strava session đã hết hạn' }
+      return { success: false, newActivities: 0, sessionExpired: true, error: 'Strava session đã hết hạn', debug: allLogs }
     }
 
-    // Fetch all athletes from teams in this challenge
+    allLogs.push(`[run] Scraped ${activities.length} activities from Strava`)
+
     const teamMembers = await prisma.teamMember.findMany({
       where: { team: { challengeId } },
       include: { athlete: true },
     })
     const athleteMap = new Map(teamMembers.map((tm) => [tm.athlete.name, tm.athlete]))
+    allLogs.push(`[run] Athletes in challenge: [${Array.from(athleteMap.keys()).join(', ')}]`)
 
     let newCount = 0
     const today = new Date()
@@ -244,9 +430,13 @@ export async function runScrapeForChallenge(challengeId: number): Promise<{
 
     for (const act of activities) {
       const athlete = athleteMap.get(act.athleteName)
-      if (!athlete) continue // only save for athletes in this challenge
+      if (!athlete) {
+        allLogs.push(`[run] ✗ No match for scraped name: "${act.athleteName}"`)
+        continue
+      }
 
       const { isValid, invalidReason } = validateActivityAgainstChallenge(act, challenge)
+      allLogs.push(`[run] ✓ Matched "${act.athleteName}" → saving (valid=${isValid})`)
 
       try {
         await prisma.activity.create({
@@ -264,14 +454,18 @@ export async function runScrapeForChallenge(challengeId: number): Promise<{
         })
         newCount++
       } catch (err: unknown) {
-        // Unique constraint violation = duplicate, skip
-        if ((err as { code?: string })?.code === 'P2002') continue
+        if ((err as { code?: string })?.code === 'P2002') {
+          allLogs.push(`[run] Duplicate skipped: "${act.athleteName}"`)
+          continue
+        }
         throw err
       }
     }
 
-    return { success: true, newActivities: newCount, sessionExpired: false }
+    allLogs.push(`[run] Done. newActivities=${newCount}`)
+    return { success: true, newActivities: newCount, sessionExpired: false, debug: allLogs }
   } catch (err) {
-    return { success: false, newActivities: 0, sessionExpired: false, error: String(err) }
+    runLogs.push(`[run] Exception: ${err}`)
+    return { success: false, newActivities: 0, sessionExpired: false, error: String(err), debug: runLogs }
   }
 }
