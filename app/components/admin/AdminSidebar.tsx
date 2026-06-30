@@ -1,21 +1,30 @@
 'use client'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
-import { signOut } from 'next-auth/react'
-import { Trophy, Users, UserCheck, BarChart2, RefreshCw, LogOut, Home } from 'lucide-react'
+import { usePathname, useRouter } from 'next/navigation'
+import { Trophy, Users, UserCheck, BarChart2, RefreshCw, LogOut, Home, Settings } from 'lucide-react'
 import { cn } from '@/app/lib/utils'
 import Image from 'next/image'
+import { toast } from 'sonner'
 
 const navItems = [
   { href: '/admin', label: 'Tổng quan', icon: BarChart2, exact: true },
   { href: '/admin/challenges', label: 'Thử thách', icon: Trophy },
   { href: '/admin/teams', label: 'Nhóm', icon: Users },
-  { href: '/admin/members', label: 'Thành viên', icon: UserCheck },
-  { href: '/admin/sync', label: 'Đồng bộ Strava', icon: RefreshCw },
+  { href: '/admin/members', label: 'Vận động viên', icon: UserCheck },
+  { href: '/admin/sync', label: 'Cào dữ liệu', icon: RefreshCw },
+  { href: '/admin/settings', label: 'Cài đặt', icon: Settings },
 ]
 
 export function AdminSidebar() {
   const pathname = usePathname()
+  const router = useRouter()
+
+  async function handleLogout() {
+    await fetch('/api/admin/logout', { method: 'POST' })
+    toast.success('Đã đăng xuất')
+    router.push('/admin/login')
+    router.refresh()
+  }
 
   return (
     <aside className="w-60 shrink-0 bg-zinc-900 border-r border-zinc-800 flex flex-col min-h-screen sticky top-0">
@@ -53,7 +62,10 @@ export function AdminSidebar() {
           <Home className="w-4 h-4" />
           Trang chủ
         </Link>
-        <button onClick={() => signOut()} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-zinc-400 hover:bg-zinc-800 hover:text-red-400 transition-all">
+        <button
+          onClick={handleLogout}
+          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-zinc-400 hover:bg-zinc-800 hover:text-red-400 transition-all"
+        >
           <LogOut className="w-4 h-4" />
           Đăng xuất
         </button>

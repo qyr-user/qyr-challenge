@@ -1,7 +1,4 @@
-import { getServerSession } from 'next-auth'
-import { authOptions } from './lib/auth'
-import { prisma } from './lib/prisma'
-import { Navbar } from './components/ui/Navbar'
+import prisma from './lib/prisma'
 import Link from 'next/link'
 import { Calendar, Users, Trophy, ArrowRight, Activity, Zap } from 'lucide-react'
 import { formatDate } from './lib/utils'
@@ -9,8 +6,6 @@ import { formatDate } from './lib/utils'
 export const revalidate = 60
 
 export default async function Home() {
-  const session = await getServerSession(authOptions)
-
   const challenges = await prisma.challenge.findMany({
     where: { isActive: true },
     orderBy: { startDate: 'desc' },
@@ -24,8 +19,6 @@ export default async function Home() {
 
   return (
     <div className="min-h-screen">
-      <Navbar />
-
       <section className="relative overflow-hidden py-32 px-4">
         <div
           className="absolute inset-0 bg-cover bg-center"
@@ -42,22 +35,16 @@ export default async function Home() {
             <br />
             <span className="text-orange-500">NHAU NÀO</span>
           </h1>
-          <p className="text-zinc-400 text-lg max-w-xl mx-auto mb-8">
-            Kết nối Strava, tham gia nhóm và cùng chinh phục những cột mốc chạy bộ với cộng đồng QYR.
+          <p className="text-zinc-400 text-lg max-w-xl mx-auto">
+            Tham gia nhóm và cùng chinh phục những cột mốc chạy bộ với cộng đồng QYR.
           </p>
-          {!session && (
-            <Link href="/login" className="btn-primary text-base px-8 py-3 inline-flex items-center gap-2">
-              Bắt đầu ngay
-              <ArrowRight className="w-4 h-4" />
-            </Link>
-          )}
         </div>
       </section>
 
       <section className="max-w-6xl mx-auto px-4 pb-20">
         <div className="flex items-center justify-between mb-8">
           <div>
-            <h2 className="text-2xl font-bold">Thử thách đang diễn ra</h2>
+            <h2 className="text-2xl font-bold">Thử thách</h2>
             <p className="text-zinc-500 text-sm mt-1">Chọn thử thách để xem bảng xếp hạng</p>
           </div>
           <div className="flex items-center gap-1 text-zinc-500 text-sm">

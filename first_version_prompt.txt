@@ -1,0 +1,15 @@
+Tôi muốn tạo 1 trang web challenger chạy bộ
+OK, dưới đây là đầy đủ spec mà tôi mong muốn
+- Người quản trị viên có thể
+1. Xem được bảng thống kê đơn giản các team xếp theo thứ hạng, tổng số km
+2. Click vào từng team sẽ có hoạt động chạy của các thành viên ( sort desc time)  trong nhóm từ ngày bắt đầu chall đến hiện tại ( bao gồm hoạt động hợp lệ và hoạt động không hợp lệ )
+3. Tạo chall, gồm ngày giờ bắt đầu ghi nhận, ngày giờ kết thúc. Setting về số lượng hoạt động tối đa, tối thiểu mỗi ngày, mỗi tuần, số km tối đa mỗi activity, range heart rate, range pace
+4. Tạo nhóm cho 1 chall cụ thể
+5. Xem danh sách tất cả những người đã connect strava, sau đó assign họ vào 1 team cụ thể và chall cụ thể
+- Người dùng:
+1. Kết nối với Strava
+2. Ở trang chủ có danh sách chall, ấn vào chall chi tiết có bảng xếp hạng team và tổng số km
+Hãy generate cho tôi đầy đủ source code, db
+Hướng dẫn từng bước 1 để setup vercel app và strava developer
+Mục tiêu tôi có thể triển khai được dự án này lên cho cộng đồng sử dụng
+Vì cộng đồng chỉ có khoảng 50 người nên tôi muốn dùng server, domain miễn phí

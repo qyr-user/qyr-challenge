@@ -1,16 +1,16 @@
-import { prisma } from '@/app/lib/prisma'
-import { Trophy, Users, Wifi } from 'lucide-react'
+import prisma from '@/app/lib/prisma'
+import { Trophy, Users, Activity } from 'lucide-react'
 import Link from 'next/link'
 import { formatDate } from '@/app/lib/utils'
 
 export const revalidate = 60
 
 export default async function AdminDashboard() {
-  const [challengeCount, teamCount, userCount, stravaCount, recentChallenges] = await Promise.all([
+  const [challengeCount, teamCount, athleteCount, activityCount, recentChallenges] = await Promise.all([
     prisma.challenge.count(),
     prisma.team.count(),
-    prisma.user.count(),
-    prisma.stravaToken.count(),
+    prisma.athlete.count(),
+    prisma.activity.count(),
     prisma.challenge.findMany({
       take: 5,
       orderBy: { createdAt: 'desc' },
@@ -20,7 +20,11 @@ export default async function AdminDashboard() {
           include: {
             _count: { select: { members: true } },
             members: {
-              include: { user: { include: { stravaToken: { include: { activities: { where: { isValid: true } } } } } } },
+              include: {
+                athlete: {
+                  include: { activities: { where: { isValid: true } } },
+                },
+              },
             },
           },
         },
@@ -31,15 +35,15 @@ export default async function AdminDashboard() {
   const stats = [
     { label: 'Thử thách', value: challengeCount, icon: Trophy, color: 'text-yellow-400' },
     { label: 'Nhóm', value: teamCount, icon: Users, color: 'text-blue-400' },
-    { label: 'Người dùng', value: userCount, icon: Users, color: 'text-purple-400' },
-    { label: 'Kết nối Strava', value: stravaCount, icon: Wifi, color: 'text-orange-400' },
+    { label: 'Vận động viên', value: athleteCount, icon: Users, color: 'text-purple-400' },
+    { label: 'Hoạt động', value: activityCount, icon: Activity, color: 'text-orange-400' },
   ]
 
   return (
     <div className="space-y-8">
       <div>
         <h1 className="text-3xl font-bold font-display tracking-wider">TỔNG QUAN</h1>
-        <p className="text-zinc-500 text-sm mt-1">Thống kê hệ thống RunChallenge</p>
+        <p className="text-zinc-500 text-sm mt-1">Thống kê hệ thống QYR Challenge</p>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -65,8 +69,7 @@ export default async function AdminDashboard() {
             const teamStats = challenge.teams
               .map(t => {
                 const totalKm = t.members.reduce((s, m) => {
-                  const acts = m.user.stravaToken?.activities || []
-                  return s + acts.reduce((sum, a) => sum + a.distanceKm, 0)
+                  return s + m.athlete.activities.reduce((sum, a) => sum + a.distanceKm, 0)
                 }, 0)
                 return { id: t.id, name: t.name, memberCount: t._count.members, totalKm }
               })

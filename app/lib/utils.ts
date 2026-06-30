@@ -5,9 +5,18 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
-export function formatKm(meters: number | null | undefined): string {
-  if (meters == null) return '0.00'
-  return (meters / 1000).toFixed(2)
+export function formatKm(km: number | null | undefined): string {
+  if (km == null) return '0.00'
+  return km.toFixed(2)
+}
+
+export function getInitials(name: string): string {
+  return name
+    .split(' ')
+    .filter(Boolean)
+    .map((w) => w[0].toUpperCase())
+    .slice(0, 2)
+    .join('')
 }
 
 export function formatPace(secondsPerKm: number | null | undefined): string {
@@ -35,8 +44,3 @@ export function formatDateTime(date: Date | string): string {
   })
 }
 
-export function isAdminEmail(email: string | null | undefined): boolean {
-  if (!email) return false
-  const adminEmails = (process.env.ADMIN_EMAILS || '').split(',').map(e => e.trim())
-  return adminEmails.includes(email)
-}

@@ -1,6 +1,5 @@
-import { prisma } from '@/app/lib/prisma'
+import prisma from '@/app/lib/prisma'
 import { notFound } from 'next/navigation'
-import { Navbar } from '@/app/components/ui/Navbar'
 import { LeaderboardList } from '@/app/components/user/LeaderboardList'
 import { formatDate } from '@/app/lib/utils'
 import { Calendar, Users, Trophy, Medal, Flame, ArrowLeft } from 'lucide-react'
@@ -8,16 +7,14 @@ import Link from 'next/link'
 
 export const revalidate = 300
 
-async function getLeaderboard(challengeId: string) {
+async function getLeaderboard(challengeId: number) {
   const teams = await prisma.team.findMany({
     where: { challengeId },
     include: {
       members: {
         include: {
-          user: {
-            include: {
-              stravaToken: { include: { activities: { where: { challengeId, isValid: true } } } },
-            },
+          athlete: {
+            include: { activities: { where: { challengeId, isValid: true } } },
           },
         },
       },
@@ -27,40 +24,27 @@ async function getLeaderboard(challengeId: string) {
   return teams
     .map(team => {
       const members = team.members.map(m => {
-        const acts = m.user.stravaToken?.activities || []
+        const acts = m.athlete.activities
         const totalKm = acts.reduce((s, a) => s + a.distanceKm, 0)
-        return {
-          userId: m.userId,
-          name: m.user.stravaToken?.athleteName || m.user.name || 'Unknown',
-          photo: m.user.stravaToken?.athletePhoto || m.user.image,
-          totalKm,
-          count: acts.length,
-        }
+        return { athleteId: m.athleteId, name: m.athlete.name, totalKm, count: acts.length }
       })
       const totalKm = members.reduce((s, m) => s + m.totalKm, 0)
-      return {
-        id: team.id,
-        name: team.name,
-        totalKm,
-        memberCount: members.length,
-        members: members.sort((a, b) => b.totalKm - a.totalKm),
-      }
+      return { id: team.id, name: team.name, totalKm, memberCount: members.length, members: members.sort((a, b) => b.totalKm - a.totalKm) }
     })
     .sort((a, b) => b.totalKm - a.totalKm)
     .map((t, i) => ({ ...t, rank: i + 1 }))
 }
 
 export default async function ChallengePage({ params }: { params: { id: string } }) {
-  const challenge = await prisma.challenge.findUnique({ where: { id: params.id } })
+  const challenge = await prisma.challenge.findUnique({ where: { id: Number(params.id) } })
   if (!challenge) notFound()
 
-  const leaderboard = await getLeaderboard(params.id)
+  const leaderboard = await getLeaderboard(Number(params.id))
   const now = new Date()
   const isActive = now >= challenge.startDate && now <= challenge.endDate
 
   return (
     <div className="min-h-screen">
-      <Navbar />
       <div className="max-w-5xl mx-auto px-4 py-8">
         <Link href="/" className="inline-flex items-center gap-2 text-zinc-500 hover:text-zinc-300 text-sm mb-6 transition-colors">
           <ArrowLeft className="w-4 h-4" />

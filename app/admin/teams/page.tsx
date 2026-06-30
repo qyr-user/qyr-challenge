@@ -1,24 +1,28 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { Plus, Trash2, Users, Activity, ChevronDown, ChevronUp } from 'lucide-react'
 import { toast } from 'sonner'
 import { useSearchParams } from 'next/navigation'
-import { formatDateTime } from '@/app/lib/utils'
+import { formatDate, formatPace } from '@/app/lib/utils'
 import { Tooltip } from '@/app/components/ui/Tooltip'
 
-interface Team { id: string; name: string; challengeId: string; _count: { members: number } }
-interface Challenge { id: string; name: string }
-interface TeamActivities { team: any; activities: any[] }
+interface Team { id: number; name: string; challengeId: number; _count: { members: number } }
+interface Challenge { id: number; name: string }
+interface TeamActivity {
+  id: number; name: string; distanceKm: number; paceSeconds?: number | null
+  activityDate: string; isValid: boolean; invalidReason?: string | null
+  athlete: { name: string }
+}
 
-export default function AdminTeamsPage() {
+function AdminTeamsContent() {
   const params = useSearchParams()
   const [challenges, setChallenges] = useState<Challenge[]>([])
   const [teams, setTeams] = useState<Team[]>([])
   const [selectedChallenge, setSelectedChallenge] = useState(params.get('challengeId') || '')
   const [newTeamName, setNewTeamName] = useState('')
   const [loading, setLoading] = useState(false)
-  const [viewingTeam, setViewingTeam] = useState<string | null>(null)
-  const [teamActivities, setTeamActivities] = useState<TeamActivities | null>(null)
+  const [viewingTeam, setViewingTeam] = useState<number | null>(null)
+  const [teamActivities, setTeamActivities] = useState<TeamActivity[]>([])
   const [actLoading, setActLoading] = useState(false)
 
   useEffect(() => { fetch('/api/challenges').then(r => r.json()).then(setChallenges) }, [])
@@ -38,7 +42,7 @@ export default function AdminTeamsPage() {
       const res = await fetch('/api/teams', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: newTeamName, challengeId: selectedChallenge }),
+        body: JSON.stringify({ name: newTeamName, challengeId: Number(selectedChallenge) }),
       })
       if (!res.ok) throw new Error()
       toast.success('Tạo nhóm thành công')
@@ -51,21 +55,21 @@ export default function AdminTeamsPage() {
     }
   }
 
-  async function deleteTeam(id: string, name: string) {
-    if (!confirm(`Xóa nhóm "${name}"? Thao tác này không thể hoàn tác.`)) return
+  async function deleteTeam(id: number, name: string) {
+    if (!confirm(`Xóa nhóm "${name}"?`)) return
     await fetch(`/api/teams?id=${id}`, { method: 'DELETE' })
     setTeams(t => t.filter(x => x.id !== id))
     toast.success('Đã xóa nhóm')
   }
 
-  async function viewActivities(teamId: string) {
+  async function viewActivities(teamId: number) {
     if (viewingTeam === teamId) { setViewingTeam(null); return }
     setViewingTeam(teamId)
     setActLoading(true)
     try {
       const res = await fetch(`/api/teams/${teamId}/activities`)
       const data = await res.json()
-      setTeamActivities(data)
+      setTeamActivities(data.activities || [])
     } catch {
       toast.error('Không thể tải hoạt động')
     } finally {
@@ -142,12 +146,12 @@ export default function AdminTeamsPage() {
                 <div className="border-t border-zinc-800 p-4">
                   {actLoading ? (
                     <p className="text-zinc-500 text-sm text-center py-4">Đang tải...</p>
-                  ) : teamActivities ? (
+                  ) : (
                     <div>
                       <p className="text-sm text-zinc-500 mb-3">
-                        {teamActivities.activities.length} hoạt động
-                        ({teamActivities.activities.filter(a => a.isValid).length} hợp lệ,{' '}
-                        {teamActivities.activities.filter(a => !a.isValid).length} không hợp lệ)
+                        {teamActivities.length} hoạt động
+                        ({teamActivities.filter(a => a.isValid).length} hợp lệ,{' '}
+                        {teamActivities.filter(a => !a.isValid).length} không hợp lệ)
                       </p>
                       <div className="overflow-x-auto">
                         <table className="w-full text-sm">
@@ -157,24 +161,18 @@ export default function AdminTeamsPage() {
                               <th className="text-left pb-2 pr-4">VĐV</th>
                               <th className="text-right pb-2 pr-4">Km</th>
                               <th className="text-right pb-2 pr-4">Pace</th>
-                              <th className="text-right pb-2 pr-4">HR</th>
-                              <th className="text-left pb-2 pr-4">Thời gian</th>
+                              <th className="text-left pb-2 pr-4">Ngày</th>
                               <th className="text-left pb-2">Trạng thái</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-zinc-800/50">
-                            {teamActivities.activities.map(a => (
+                            {teamActivities.map(a => (
                               <tr key={a.id} className={a.isValid ? '' : 'opacity-60'}>
                                 <td className="py-2 pr-4 truncate max-w-[140px]">{a.name}</td>
-                                <td className="py-2 pr-4 text-zinc-400 text-xs">{a.stravaToken?.athleteName || '—'}</td>
+                                <td className="py-2 pr-4 text-zinc-400 text-xs">{a.athlete.name}</td>
                                 <td className="py-2 pr-4 text-right font-mono text-orange-400">{a.distanceKm.toFixed(2)}</td>
-                                <td className="py-2 pr-4 text-right font-mono text-zinc-400 text-xs">
-                                  {a.paceSeconds ? `${Math.floor(a.paceSeconds / 60)}:${(a.paceSeconds % 60).toString().padStart(2, '0')}` : '--'}
-                                </td>
-                                <td className="py-2 pr-4 text-right text-zinc-400 text-xs">
-                                  {a.averageHeartRate ? Math.round(a.averageHeartRate) : '--'}
-                                </td>
-                                <td className="py-2 pr-4 text-zinc-500 text-xs">{formatDateTime(a.startDate)}</td>
+                                <td className="py-2 pr-4 text-right font-mono text-zinc-400 text-xs">{formatPace(a.paceSeconds)}</td>
+                                <td className="py-2 pr-4 text-zinc-500 text-xs">{formatDate(a.activityDate)}</td>
                                 <td className="py-2">
                                   {a.isValid ? (
                                     <span className="badge-valid">✓ Hợp lệ</span>
@@ -188,9 +186,10 @@ export default function AdminTeamsPage() {
                             ))}
                           </tbody>
                         </table>
+                        {teamActivities.length === 0 && <p className="text-center text-zinc-600 text-sm py-8">Chưa có hoạt động nào</p>}
                       </div>
                     </div>
-                  ) : null}
+                  )}
                 </div>
               )}
             </div>
@@ -198,5 +197,13 @@ export default function AdminTeamsPage() {
         })}
       </div>
     </div>
+  )
+}
+
+export default function AdminTeamsPage() {
+  return (
+    <Suspense>
+      <AdminTeamsContent />
+    </Suspense>
   )
 }

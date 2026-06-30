@@ -1,0 +1,18 @@
+Tôi đã tìm được cách có thể free và không cần xin duyệt. Đó chính là mời người dùng vào 1 clb ở strava, sau đó tôi sẽ cào dữ liệu từ feed của clb đó. hãy tham khảo file "/strava_club_scaper.py" này về cách cào dữ liệu
+Hãy giúp tôi sửa source code hiện tại theo hướng sau:
+
+- Ở trang chủ, sẽ không còn login, chỉ còn hiển thị cách chall đang diễn ra, ấn vào thì sẽ show như hiện tại ( k chỉnh sửa gì thêm)
+- Ở trang chủ sẽ luôn hiển thị "admin" option ở header, thay vì như cũ là phải login bằng account admin mới hiển thị, sau đó ấn vào thì cần nhập mật khẩu tài khoản cứng ( fix trong db là admin/admin)
+- Ở phần thành viên, admin sẽ tạo mới bằng cách nhập tay tên của vđv để tạo thành viên, sau này dữ liệu cào sẽ compare với tên này ( phải chính xác từ viết hoa, viết thường, dấu chữ,...) ( admin phải chịu trách nhiệm nhập chính xác). Loại bỏ avt của thành viên ở tất cả các nơi trong src code vì crawl data sẽ k có avt. Có thể để avt của vdv bằng các chữ cái đầu (vd: vdv tên Dung Nguyen thì avt là hình vuông có chữ DN)
+- Hệ thống sẽ tự động cào dữ liệu 2 lần trong 1 ngày vào 8h sáng và 8h tối. Ngoài ra thêm cào thủ công bằng cách ấn nút ở admin ( giống chức năng sync thủ công hiện tại ). Cào cho 1 chall cụ thể. Nếu không có chall nào đang diễn ra, sẽ không chạy cào tự động cũng như nút cào thủ công ở chall đó sẽ bị disabled
+- Khi cào thì cần loại bỏ các dữ liệu giống đã cào trước đó để tránh lặp dữ liệu.
+- Chỉ cào với dữ liệu của ngày hôm nay ( do phân trang dữ liệu của strava feed).
+- Vì tôi đang set cứng strava session ( để bypasss login) và id của clb strava ở trong file py. Hãy giúp tôi chuyển cả 2 thành biến trong db và có thể thay đổi ở trong admin dashboard. Riêng id của clb strava thì set theo từng chall ( lúc tạo và edit chall cần input)
+- Khi strava session hết hạn ( có thể check thông qua việc không vào được dashboard strava clb hoặc cách nào khác) thì hãy hiển thị 1 "header badge" ở web dashboard ( cả ở ngoài cùng admin) về viêc cần cập nhật để admin có thể biết và vào set giá trị mới.
+- Vì craw data chỉ lấy được thời gian chạy, pace, khoảng cách nên hãy loại bỏ nhịp tim trong hệ thống.
+- các chức năng khác giữ nguyên
+- Thiết kế lại toàn bộ database để phù hợp với src code mới (ngoài ra, tôi muốn sửa là id của các bảng là dạng number auto increment)
+- tổ chức lại source code nếu cần
+
+Hãy sửa đầy đủ các ý trên
+Sau đó viết 1 file .md hướng dẫn tôi từng bước một setup ở vercel app và các tiện ích khác nếu cần (ví dụ vercel, neon, github,...)
