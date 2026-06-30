@@ -15,12 +15,11 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 
   const athleteIds = team.members.map(m => m.athleteId)
 
-  const where: Parameters<typeof prisma.activity.findMany>[0]['where'] = {
+  const where = {
     athleteId: { in: athleteIds },
     challengeId: team.challengeId,
+    ...(filter === 'valid' ? { isValid: true } : filter === 'invalid' ? { isValid: false } : {}),
   }
-  if (filter === 'valid') where.isValid = true
-  if (filter === 'invalid') where.isValid = false
 
   const [total, activities] = await Promise.all([
     prisma.activity.count({ where }),
