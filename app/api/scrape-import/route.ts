@@ -55,7 +55,7 @@ export async function POST(req: NextRequest) {
       continue
     }
 
-    const { isValid, invalidReason } = validateActivityAgainstChallenge(act, challenge)
+    const { isValid, invalidReason } = validateActivityAgainstChallenge({ ...act, activityDate: today, paceSeconds: act.paceSeconds ?? null }, challenge)
 
     try {
       await prisma.activity.create({
@@ -82,6 +82,6 @@ export async function POST(req: NextRequest) {
     ok: true,
     saved,
     skipped,
-    noMatch: [...new Set(noMatch)],
+    noMatch: noMatch.filter((v, i, a) => a.indexOf(v) === i),
   })
 }
