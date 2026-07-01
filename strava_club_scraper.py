@@ -20,8 +20,8 @@ if os.path.exists(_env_file):
                 k, v = line.split("=", 1)
                 os.environ.setdefault(k.strip(), v.strip().strip('"'))
 
-API_BASE_URL = os.environ.get("APP_BASE_URL", "").rstrip("/")
-API_SECRET   = os.environ.get("SCRAPE_IMPORT_SECRET", "")
+API_BASE_URL = "https://qyr-challenge.vercel.app"
+API_SECRET   = "your-scrape-import-secret-here"
 
 
 def calculate_pace(distance_str, duration_str):
