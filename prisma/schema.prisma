@@ -43,6 +43,21 @@ model Challenge {
 
   teams      Team[]
   activities Activity[]
+  scrapeLogs ScrapeLog[]
+}
+
+model ScrapeLog {
+  id            Int      @id @default(autoincrement())
+  challengeId   Int
+  triggeredBy   String   // 'manual' | 'cron'
+  success       Boolean
+  newActivities Int      @default(0)
+  sessionExpired Boolean @default(false)
+  error         String?
+  debug         String?  @db.Text
+  createdAt     DateTime @default(now())
+
+  challenge Challenge @relation(fields: [challengeId], references: [id], onDelete: Cascade)
 }
 
 model Team {

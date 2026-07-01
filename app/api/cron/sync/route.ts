@@ -19,7 +19,7 @@ export async function GET(req: NextRequest) {
 
   const results = []
   for (const challenge of activeChallenges) {
-    const result = await runScrapeForChallenge(challenge.id)
+    const result = await runScrapeForChallenge(challenge.id, 'cron')
     results.push({ challengeId: challenge.id, name: challenge.name, ...result })
   }
 

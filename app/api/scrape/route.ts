@@ -9,7 +9,7 @@ export async function POST(req: NextRequest) {
   const { challengeId } = await req.json()
   if (!challengeId) return NextResponse.json({ error: 'Thiếu challengeId' }, { status: 400 })
 
-  const result = await runScrapeForChallenge(Number(challengeId))
+  const result = await runScrapeForChallenge(Number(challengeId), 'manual')
 
   if (!result.success) {
     return NextResponse.json({ error: result.error, sessionExpired: result.sessionExpired, debug: result.debug }, { status: 400 })
