@@ -42,25 +42,59 @@ function calculatePaceSeconds(distanceKm: number, durationSeconds: number): numb
   return Math.round(durationSeconds / distanceKm)
 }
 
+function parseCookiesFromHeader(header: string): string {
+  return header
+    .split(',')
+    .map(c => c.split(';')[0].trim())
+    .filter(c => c.includes('='))
+    .join('; ')
+}
+
+const COMMON_HEADERS = {
+  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+  'Accept-Language': 'vi-VN,vi;q=0.9,en-US;q=0.8,en;q=0.7',
+  'Cache-Control': 'no-cache',
+}
+
 export async function scrapeStravaClubToday(
   sessionCookie: string,
   clubId: string
 ): Promise<{ activities: ScrapedActivity[]; sessionExpired: boolean; debug: string[] }> {
   const logs: string[] = []
+
+  // Step 1: Visit homepage first (like Selenium does) to collect base cookies
+  let baseCookies = ''
+  try {
+    logs.push('[scrape] Step 1: Fetching homepage to collect base cookies...')
+    const homeRes = await fetch('https://www.strava.com/', {
+      headers: {
+        ...COMMON_HEADERS,
+        Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+      },
+      redirect: 'follow',
+    })
+    const homeSetCookie = homeRes.headers.get('set-cookie') || ''
+    baseCookies = parseCookiesFromHeader(homeSetCookie)
+    logs.push(`[scrape] Homepage HTTP ${homeRes.status}, base cookies: ${baseCookies || '(none)'}`)
+  } catch (err) {
+    logs.push(`[scrape] Homepage fetch failed (non-fatal): ${err}`)
+  }
+
+  const cookieHeader = baseCookies
+    ? `_strava4_session=${sessionCookie}; ${baseCookies}`
+    : `_strava4_session=${sessionCookie}`
+
   const url = `https://www.strava.com/clubs/${clubId}/recent_activity`
   let html: string
 
-  logs.push(`[scrape] Fetching: ${url}`)
+  logs.push(`[scrape] Step 2: Fetching club page: ${url}`)
 
   try {
     const res = await fetch(url, {
       headers: {
-        Cookie: `_strava4_session=${sessionCookie}`,
-        'User-Agent':
-          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+        ...COMMON_HEADERS,
+        Cookie: cookieHeader,
         Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
-        'Accept-Language': 'vi-VN,vi;q=0.9,en-US;q=0.8,en;q=0.7',
-        'Cache-Control': 'no-cache',
         Referer: 'https://www.strava.com/',
       },
       redirect: 'follow',
@@ -74,14 +108,13 @@ export async function scrapeStravaClubToday(
       return { activities: [], sessionExpired: true, debug: logs }
     }
 
-    // Collect all cookies from response to use in subsequent requests
-    const setCookieHeader = res.headers.get('set-cookie') || ''
-    const responseCookies = setCookieHeader
-      .split(',')
-      .map(c => c.split(';')[0].trim())
-      .filter(Boolean)
-      .join('; ')
-    logs.push(`[scrape] Response Set-Cookie count: ${setCookieHeader ? setCookieHeader.split(',').length : 0}`)
+    // Collect cookies from club page response too
+    const clubSetCookie = res.headers.get('set-cookie') || ''
+    const clubCookies = parseCookiesFromHeader(clubSetCookie)
+    if (clubCookies) {
+      baseCookies = baseCookies ? `${baseCookies}; ${clubCookies}` : clubCookies
+      logs.push(`[scrape] Club page also set cookies: ${clubCookies}`)
+    }
 
     html = await res.text()
     logs.push(`[scrape] HTML length: ${html.length} chars`)
@@ -95,13 +128,15 @@ export async function scrapeStravaClubToday(
       return { activities: [], sessionExpired: true, debug: logs }
     }
 
-    // Tìm embedded JSON data trong HTML (Strava có thể nhúng sẵn feed data)
-    const bootstrapMatch = html.match(/bootstrap_data\s*=\s*({.{0,2000}})/)
-    const stravaPropsMatch = html.match(/window\.__strava[A-Z]\w*\s*=\s*({.{0,500}})/)
-    const pagePropsMatch = html.match(/"pageProps"\s*:\s*({.{0,500}})/)
-    logs.push(`[scrape] Has bootstrap_data: ${!!bootstrapMatch}`)
-    logs.push(`[scrape] Has window.__strava*: ${!!stravaPropsMatch}`)
-    logs.push(`[scrape] Has pageProps: ${!!pagePropsMatch}`)
+    // Extract athlete ID — required for feed endpoint
+    const athleteIdMatch = html.match(/"athleteId"\s*:\s*(\d+)/)
+      || html.match(/athlete_id['":\s]+(\d+)/)
+      || html.match(/currentAthlete[^}]*"id"\s*:\s*(\d+)/)
+      || html.match(/"id"\s*:\s*(\d+)[^}]*"isCurrentAthlete"\s*:\s*true/)
+      || html.match(/data-athlete-id=["'](\d+)["']/)
+      || html.match(/\/athletes\/(\d+)\/edit/)
+    const athleteId = athleteIdMatch?.[1] || ''
+    logs.push(`[scrape] Athlete ID from HTML: ${athleteId || '(not found)'}`)
 
     // Kiểm tra xem HTML có chứa feed data không
     const hasTestId = html.includes('data-testid="entry-header"')
@@ -113,7 +148,7 @@ export async function scrapeStravaClubToday(
       // Strava renders feed via JS — static fetch gets empty shell
       // Try the JSON feed endpoint with CSRF token + response cookies
       logs.push('[scrape] No feed HTML found — trying JSON feed endpoint...')
-      return await scrapeViaJsonFeed(sessionCookie, clubId, logs, html, responseCookies)
+      return await scrapeViaJsonFeed(sessionCookie, clubId, logs, html, baseCookies, athleteId)
     }
   } catch (err) {
     logs.push(`[scrape] Fetch error: ${err}`)
@@ -206,7 +241,8 @@ async function scrapeViaJsonFeed(
   clubId: string,
   logs: string[],
   mainHtml?: string,
-  responseCookies?: string
+  responseCookies?: string,
+  athleteId?: string
 ): Promise<{ activities: ScrapedActivity[]; sessionExpired: boolean; debug: string[] }> {
   // Extract CSRF token from main page HTML
   let csrfToken = ''
@@ -223,9 +259,9 @@ async function scrapeViaJsonFeed(
   }
 
   const before = Math.floor(Date.now() / 1000)
-  const feedUrl = `https://www.strava.com/clubs/${clubId}/feed?feed_type=club&athlete_id=&before=${before}&cursor=`
+  const feedUrl = `https://www.strava.com/clubs/${clubId}/feed?feed_type=club&athlete_id=${athleteId || ''}&before=${before}&cursor=`
   logs.push(`[json-feed] Trying: ${feedUrl}`)
-  logs.push(`[json-feed] CSRF token present: ${!!csrfToken}`)
+  logs.push(`[json-feed] CSRF token present: ${!!csrfToken}, athleteId: ${athleteId || '(none)'}`)
 
   try {
     const cookieStr = responseCookies

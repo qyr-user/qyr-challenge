@@ -1,34 +1,47 @@
 import time
 import re
+import json
+import os
+import urllib.request
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
 from webdriver_manager.chrome import ChromeDriverManager
 
-STRAVA_SESSION_COOKIE = "nvbdo9gmg92u3pli66tlgmcm9tc5k7l6"
-CLUB_ID = "2224942"
+# Đọc .env nếu có (không cần cài thư viện dotenv)
+_env_file = os.path.join(os.path.dirname(__file__), ".env")
+if os.path.exists(_env_file):
+    with open(_env_file) as f:
+        for line in f:
+            line = line.strip()
+            if line and not line.startswith("#") and "=" in line:
+                k, v = line.split("=", 1)
+                os.environ.setdefault(k.strip(), v.strip().strip('"'))
+
+CLUB_ID      = os.environ.get("STRAVA_CLUB_ID", "")
+API_BASE_URL = os.environ.get("APP_BASE_URL", "").rstrip("/")
+API_SECRET   = os.environ.get("SCRAPE_IMPORT_SECRET", "")
+CHALLENGE_ID = int(os.environ.get("CHALLENGE_ID", "0"))
+
 
 def calculate_pace(distance_str, duration_str):
     try:
         dist_match = re.search(r"([0-9.,]+)", distance_str)
         if not dist_match:
-            return "--:--"
+            return None
         distance = float(dist_match.group(1).replace(",", "."))
         if distance == 0:
-            return "--:--"
+            return None
 
         total_seconds = 0
         hr_match = re.search(r"(\d+)\s*(?:giờ|h|hour)", duration_str, re.IGNORECASE)
         if hr_match:
             total_seconds += int(hr_match.group(1)) * 3600
-            
         min_match = re.search(r"(\d+)\s*(?:phút|m|min)", duration_str, re.IGNORECASE)
         if min_match:
             total_seconds += int(min_match.group(1)) * 60
-            
         sec_match = re.search(r"(\d+)\s*(?:giây|s|sec)", duration_str, re.IGNORECASE)
         if sec_match:
             total_seconds += int(sec_match.group(1))
@@ -36,144 +49,235 @@ def calculate_pace(distance_str, duration_str):
         if total_seconds == 0:
             nums = re.findall(r"\d+", duration_str)
             if len(nums) >= 2:
-                total_seconds = int(nums[0])*60 + int(nums[1])
+                total_seconds = int(nums[0]) * 60 + int(nums[1])
             elif len(nums) == 1:
-                total_seconds = int(nums[0])*60
+                total_seconds = int(nums[0]) * 60
 
-        if total_seconds == 0:
-            return "--:--"
+        if total_seconds == 0 or distance == 0:
+            return None
 
-        seconds_per_km = total_seconds / distance
-        pace_minutes = int(seconds_per_km // 60)
-        pace_seconds = int(round(seconds_per_km % 60))
-        
-        if pace_seconds == 60:
-            pace_minutes += 1
-            pace_seconds = 0
-
-        return f"{pace_minutes}:{pace_seconds:02d} /km"
+        return round(total_seconds / distance)
     except Exception:
-        return "--:--"
+        return None
 
-def crawl_strava_all_runners():
+
+def parse_distance_km(distance_str):
+    try:
+        match = re.search(r"([0-9.,]+)", distance_str)
+        if not match:
+            return 0.0
+        return float(match.group(1).replace(",", "."))
+    except Exception:
+        return 0.0
+
+
+def parse_duration_seconds(duration_str):
+    if not duration_str:
+        return 0
+    total = 0
+    hr = re.search(r"(\d+)\s*(?:giờ|h(?!r))", duration_str, re.IGNORECASE)
+    mn = re.search(r"(\d+)\s*(?:phút|min|m(?!\s*[0-9]))", duration_str, re.IGNORECASE)
+    sc = re.search(r"(\d+)\s*(?:giây|sec|s(?!\w))", duration_str, re.IGNORECASE)
+    if hr: total += int(hr.group(1)) * 3600
+    if mn: total += int(mn.group(1)) * 60
+    if sc: total += int(sc.group(1))
+    if total == 0:
+        parts = re.match(r"^(\d+):(\d{2})$", duration_str.strip())
+        if parts:
+            total = int(parts.group(1)) * 60 + int(parts.group(2))
+    return total
+
+
+def fetch_strava_session():
+    """Lấy session cookie từ DB qua API — admin cập nhật qua trang Settings."""
+    url = f"{API_BASE_URL}/api/scrape-config"
+    req = urllib.request.Request(
+        url,
+        headers={"Authorization": f"Bearer {API_SECRET}"},
+        method="GET",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=10) as res:
+            data = json.loads(res.read().decode("utf-8"))
+            session = data.get("stravaSession")
+            valid = data.get("sessionValid", True)
+            if not session:
+                print("✗ Chưa cấu hình Strava session trong Admin → Settings")
+                return None
+            if not valid:
+                print("⚠ Strava session đã được đánh dấu hết hạn. Hãy cập nhật trong Admin → Settings trước khi chạy.")
+                return None
+            print(f"✓ Lấy session cookie từ DB thành công (length: {len(session)})")
+            return session
+    except Exception as ex:
+        print(f"✗ Không lấy được session từ API: {ex}")
+        return None
+
+
+def crawl_strava():
+    missing = [k for k, v in {
+        "STRAVA_CLUB_ID": CLUB_ID,
+        "APP_BASE_URL": API_BASE_URL,
+        "SCRAPE_IMPORT_SECRET": API_SECRET,
+        "CHALLENGE_ID": str(CHALLENGE_ID),
+    }.items() if not v or v == "0"]
+    if missing:
+        print(f"✗ Thiếu config trong .env: {', '.join(missing)}")
+        return []
+
+    strava_session = fetch_strava_session()
+    if not strava_session:
+        return []
+
     chrome_options = Options()
     chrome_options.add_argument("--window-size=1280,1000")
     chrome_options.add_argument("--ignore-certificate-errors")
-    
-    print("[1/4] Đang khởi tạo trình duyệt ảo...")
+
+    print("[1/5] Đang khởi tạo trình duyệt...")
     driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
+
+    activities = []
 
     try:
         driver.get("https://strava.com")
         time.sleep(1)
         driver.add_cookie({
             "name": "_strava4_session",
-            "value": STRAVA_SESSION_COOKIE,
+            "value": strava_session,
             "domain": ".strava.com",
             "path": "/"
         })
 
         club_url = f"https://strava.com/clubs/{CLUB_ID}/recent_activity"
-        print(f"[2/4] Đang chuyển hướng tới Câu lạc bộ: {club_url}")
+        print(f"[2/5] Chuyển hướng tới: {club_url}")
         driver.get(club_url)
 
-        print("Đang chờ trang web tải dữ liệu chạy bộ (Tối đa 30 giây)...")
         WebDriverWait(driver, 30).until(
             lambda d: d.execute_script("return document.readyState") == "complete"
         )
         time.sleep(4)
 
-        # Cuộn chuột sâu 3 lần để Strava tải hết toàn bộ hoạt động trong ngày
-        print("Đang tự động cuộn trình duyệt xuống để quét toàn bộ bài đăng...")
+        print("[3/5] Đang cuộn trang để tải đầy đủ hoạt động...")
         for _ in range(3):
             driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
             time.sleep(2)
 
-        # CHIẾN THUẬT MỚI: Tìm TRỰC TIẾP thẻ header thông tin của từng VĐV đơn lẻ (Không phân biệt đơn hay nhóm)
-        # Tất cả các bài chạy dù đơn hay nhóm đều có thẻ div mang thuộc tính data-testid="entry-header"
         runner_headers = driver.find_elements(By.XPATH, "//div[@data-testid='entry-header']")
-        
-        print(f"\n[3/4] Tiến hành bóc tách và lọc trùng chạy đơn/chạy nhóm ngày HÔM NAY:")
-        print(f"{'VẬN ĐỘNG VIÊN':<20} | {'QUÃNG ĐƯỜNG':<12} | {'PACE (NHỊP ĐỘ)':<15} | {'THỜI GIAN':<15} | {'TÊN BUỔI CHẠY'}")
-        print("-" * 105)
+        print(f"[4/5] Tìm thấy {len(runner_headers)} entry-header, đang lọc hoạt động hôm nay...")
+        print(f"\n{'VẬN ĐỘNG VIÊN':<25} | {'QUÃNG ĐƯỜNG':<12} | {'THỜI GIAN':<12} | {'TÊN BUỔI CHẠY'}")
+        print("-" * 80)
 
-        total_runners = 0
         for header in runner_headers:
             try:
-                # BƯỚC 1: Dò tìm thẻ thời gian <time> gần nhất bằng cách tìm ngược lên khối bài đăng cha
-                # Khối bài đăng lớn bao bọc luôn là div có class chứa 'web-feed-entry' hoặc id 'feed-entry-'
-                parent_entry = header.find_element(By.XPATH, "./ancestor::div[@data-testid='web-feed-entry' or contains(@id, 'feed-entry-')]")
-                
+                parent_entry = header.find_element(By.XPATH,
+                    "./ancestor::div[@data-testid='web-feed-entry' or contains(@id, 'feed-entry-')]")
+
                 try:
-                    time_element = parent_entry.find_element(By.XPATH, ".//time[@data-testid='date_at_time']")
-                    run_time_text = time_element.text.strip().lower()
-                except:
+                    time_el = parent_entry.find_element(By.XPATH, ".//time[@data-testid='date_at_time']")
+                    time_text = time_el.text.strip().lower()
+                except Exception:
                     continue
 
-                # Lọc: Chỉ lấy dữ liệu chạy của ngày "Hôm nay" hoặc "Today"
-                if "hôm nay" not in run_time_text and "today" not in run_time_text:
+                if "hôm nay" not in time_text and "today" not in time_text:
                     continue
 
-                # BƯỚC 2: Bóc tách dữ liệu của VĐV này
-                # 1. Tên VĐV
                 athlete_name = header.find_element(By.XPATH, ".//a[@data-testid='owners-name']").text.strip()
                 if not athlete_name or athlete_name.lower() == "hồ sơ":
                     continue
 
-                # Xác định vùng chứa chỉ số chạy (Quãng đường, Pace, Thời gian) tương ứng với người này
-                # Đối với chạy nhóm, dữ liệu nằm chung trong thẻ cha <li> của header đó. Đối với chạy đơn, nằm trong block lớn.
                 try:
                     stats_container = header.find_element(By.XPATH, "./ancestor::li")
-                except:
+                except Exception:
                     stats_container = parent_entry
 
-                # 2. Tên buổi chạy
                 try:
-                    activity_title = stats_container.find_element(By.XPATH, ".//a[@data-testid='activity_name']").text.strip()
-                except:
-                    activity_title = parent_entry.find_element(By.XPATH, ".//a[@data-testid='activity_name']").text.strip()
+                    activity_title = stats_container.find_element(By.XPATH,
+                        ".//a[@data-testid='activity_name']").text.strip()
+                except Exception:
+                    try:
+                        activity_title = parent_entry.find_element(By.XPATH,
+                            ".//a[@data-testid='activity_name']").text.strip()
+                    except Exception:
+                        activity_title = "Running"
 
-                # 3. Quãng đường
-                distance = "0 km"
+                distance_str = "0 km"
                 try:
-                    distance_element = stats_container.find_element(By.XPATH, ".//span[contains(text(), 'Quãng đường') or contains(text(), 'Distance')]/following-sibling::div")
-                    distance = distance_element.text.strip()
-                except:
+                    dist_el = stats_container.find_element(By.XPATH,
+                        ".//span[contains(text(),'Quãng đường') or contains(text(),'Distance')]/following-sibling::div")
+                    distance_str = dist_el.text.strip()
+                except Exception:
                     pass
 
-                # 4. Thời gian (Duration)
-                duration = ""
+                duration_str = ""
                 try:
-                    duration_element = stats_container.find_element(By.XPATH, ".//span[contains(text(), 'Thời gian') or contains(text(), 'Time')]/following-sibling::div")
-                    duration = duration_element.text.strip()
-                except:
+                    dur_el = stats_container.find_element(By.XPATH,
+                        ".//span[contains(text(),'Thời gian') or contains(text(),'Time')]/following-sibling::div")
+                    duration_str = dur_el.text.strip()
+                except Exception:
                     pass
 
-                # 5. Pace (Nhịp độ)
-                pace = ""
-                try:
-                    pace_element = stats_container.find_element(By.XPATH, ".//span[contains(text(), 'Nhịp độ') or contains(text(), 'Pace')]/following-sibling::div")
-                    pace = pace_element.text.strip()
-                except:
-                    pass
+                distance_km = parse_distance_km(distance_str)
+                moving_time = parse_duration_seconds(duration_str)
+                pace_seconds = calculate_pace(distance_str, duration_str)
 
-                # Nếu không cào được Pace hoặc bài đăng của Văn Nam thiếu Pace, tự động tính toán
-                if not pace or pace == "--:--" or pace == "":
-                    pace = calculate_pace(distance, duration) + " (Tính)"
+                print(f"{athlete_name:<25} | {distance_str:<12} | {duration_str:<12} | {activity_title}")
 
-                print(f"{athlete_name:<20} | {distance:<12} | {pace:<15} | {duration:<15} | {activity_title}")
-                total_runners += 1
+                activities.append({
+                    "athleteName": athlete_name,
+                    "activityName": activity_title,
+                    "distanceKm": distance_km,
+                    "movingTime": moving_time,
+                    "paceSeconds": pace_seconds,
+                })
 
             except Exception:
                 continue
 
-        print(f"\n[4/4] Đã hoàn thành! Tổng cộng cào được {total_runners} hoạt động trong ngày HÔM NAY.")
-
     except Exception as ex:
-        print(f"Có lỗi hệ thống xảy ra: {ex}")
+        print(f"Lỗi hệ thống: {ex}")
     finally:
         driver.quit()
-        print("Đã đóng trình duyệt ảo giải phóng RAM.")
+        print("Đã đóng trình duyệt.")
+
+    return activities
+
+
+def send_to_api(activities):
+    if not activities:
+        print("\n[5/5] Không có hoạt động nào để gửi.")
+        return
+
+    print(f"\n[5/5] Đang gửi {len(activities)} hoạt động lên API...")
+
+    payload = json.dumps({
+        "challengeId": CHALLENGE_ID,
+        "activities": activities,
+    }).encode("utf-8")
+
+    url = f"{API_BASE_URL}/api/scrape-import"
+    req = urllib.request.Request(
+        url,
+        data=payload,
+        headers={
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {API_SECRET}",
+        },
+        method="POST",
+    )
+
+    try:
+        with urllib.request.urlopen(req, timeout=30) as res:
+            body = json.loads(res.read().decode("utf-8"))
+            print(f"✓ Đã lưu: {body.get('saved')} hoạt động mới")
+            if body.get("skipped"):
+                print(f"  Bỏ qua (trùng): {body.get('skipped')}")
+            if body.get("noMatch"):
+                print(f"  ⚠ Không khớp tên VĐV (cần tạo trong Admin): {body.get('noMatch')}")
+    except Exception as ex:
+        print(f"✗ Lỗi gửi API: {ex}")
+
 
 if __name__ == "__main__":
-    crawl_strava_all_runners()
+    results = crawl_strava()
+    print(f"\nTổng cộng: {len(results)} hoạt động hôm nay.")
+    send_to_api(results)
