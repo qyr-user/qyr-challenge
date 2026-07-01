@@ -1,7 +1,6 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
-import { RefreshCw, Clock, AlertTriangle, ChevronDown, ChevronUp } from 'lucide-react'
-import { toast } from 'sonner'
+import { RefreshCw, Clock, AlertTriangle, ChevronDown, ChevronUp, ExternalLink, Github } from 'lucide-react'
 
 interface Challenge { id: number; name: string; isActive: boolean; startDate: string; endDate: string; stravaClubId?: string }
 
@@ -27,9 +26,11 @@ function fmtTime(iso: string) {
   return new Date(iso).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', hour12: false })
 }
 
+const GITHUB_REPO = 'qyr-user/qyr-challenge'
+const GITHUB_ACTIONS_URL = `https://github.com/${GITHUB_REPO}/actions/workflows/scrape.yml`
+
 export default function AdminSyncPage() {
   const [challenges, setChallenges] = useState<Challenge[]>([])
-  const [syncing, setSyncing] = useState<number | null>(null)
   const [logs, setLogs] = useState<ScrapeLog[]>([])
   const [expandedLog, setExpandedLog] = useState<number | null>(null)
   const [loadingLogs, setLoadingLogs] = useState(false)
@@ -49,86 +50,86 @@ export default function AdminSyncPage() {
     fetchLogs()
   }, [fetchLogs])
 
-  async function scrapeChallenge(challengeId: number) {
-    setSyncing(challengeId)
-    try {
-      const res = await fetch('/api/scrape', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ challengeId }),
-      })
-      const data = await res.json()
-      if (!res.ok) {
-        toast.error(data.error || 'Cào dữ liệu thất bại')
-      } else {
-        toast.success(`Cào xong! ${data.newActivities} hoạt động mới`)
-      }
-      await fetchLogs()
-    } catch {
-      toast.error('Cào dữ liệu thất bại')
-    } finally {
-      setSyncing(null)
-    }
-  }
+  const ongoingChallenges = challenges.filter(isChallengeOngoing)
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold">Cào dữ liệu Strava</h1>
-        <p className="text-zinc-500 text-sm">Lấy hoạt động hôm nay từ Strava Club feed</p>
+        <p className="text-zinc-500 text-sm">Dữ liệu được cào tự động qua GitHub Actions</p>
       </div>
 
-      <div className="card p-5 border-blue-500/20 bg-blue-500/5">
-        <h3 className="font-semibold text-blue-400 mb-2">📌 Thông tin</h3>
-        <ul className="text-sm text-zinc-400 space-y-1 list-disc list-inside">
-          <li>Hệ thống tự động cào dữ liệu <strong>2 lần/ngày</strong>: 8:00 sáng và 8:00 tối (múi giờ Việt Nam)</li>
-          <li>Chỉ cào hoạt động của <strong>ngày hôm nay</strong></li>
-          <li>Dữ liệu trùng lặp sẽ tự động bỏ qua</li>
-          <li>Tên VĐV phải khớp chính xác với tên trên Strava để được ghi nhận</li>
-        </ul>
+      {/* Status card */}
+      <div className="card p-5 border-emerald-500/20 bg-emerald-500/5">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h3 className="font-semibold text-emerald-400 mb-1">⏱ Lịch cào tự động</h3>
+            <ul className="text-sm text-zinc-400 space-y-1">
+              <li>• <strong>8:00 sáng</strong> giờ Việt Nam (hàng ngày)</li>
+              <li>• <strong>8:00 tối</strong> giờ Việt Nam (hàng ngày)</li>
+              <li>• <strong>11:50 tối</strong> giờ Việt Nam (hàng ngày)</li>
+              <li className="text-zinc-500 text-xs mt-2">Dùng Selenium + Chrome thật → lấy được dữ liệu từ Strava</li>
+            </ul>
+          </div>
+          <a
+            href={GITHUB_ACTIONS_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="btn-secondary flex items-center gap-2 text-sm shrink-0"
+          >
+            <Github className="w-4 h-4" />
+            Xem trên GitHub
+            <ExternalLink className="w-3 h-3" />
+          </a>
+        </div>
       </div>
 
-      {/* Challenge list + scrape buttons */}
-      <div className="space-y-3">
-        {challenges.map(c => {
-          const ongoing = isChallengeOngoing(c)
-          const hasClub = !!c.stravaClubId
-          const canScrape = ongoing && hasClub
-          const isSyncing = syncing === c.id
+      {/* Manual trigger guide */}
+      <div className="card p-5">
+        <h3 className="font-semibold mb-3 flex items-center gap-2">
+          <Github className="w-4 h-4 text-zinc-400" />
+          Cào thủ công qua GitHub Actions
+        </h3>
+        <ol className="text-sm text-zinc-400 space-y-2 list-decimal list-inside mb-4">
+          <li>Truy cập trang <a href={GITHUB_ACTIONS_URL} target="_blank" rel="noopener noreferrer" className="text-orange-400 hover:text-orange-300 inline-flex items-center gap-1">GitHub Actions — Strava Scraper <ExternalLink className="w-3 h-3" /></a></li>
+          <li>Nhấn nút <strong className="text-zinc-300">Run workflow</strong> (góc phải)</li>
+          <li>Chọn branch <code className="bg-zinc-800 px-1.5 py-0.5 rounded text-orange-400">main</code> → nhấn <strong className="text-zinc-300">Run workflow</strong></li>
+          <li>Đợi ~2 phút, kết quả sẽ xuất hiện trong lịch sử bên dưới</li>
+        </ol>
+        <div className="bg-zinc-900 rounded p-3 text-xs text-zinc-500 border border-zinc-800">
+          <strong className="text-zinc-400">Lý do không dùng nút thủ công trực tiếp:</strong> Strava render feed bằng JavaScript,
+          server-side <code>fetch()</code> không lấy được dữ liệu. Chỉ trình duyệt thật (Selenium) mới hoạt động,
+          và Selenium cần chạy trên GitHub Actions runner — không thể chạy trên Vercel.
+        </div>
+      </div>
 
-          return (
-            <div key={c.id} className="card p-4">
-              <div className="flex items-center justify-between">
+      {/* Active challenges status */}
+      {challenges.length > 0 && (
+        <div className="space-y-2">
+          <h3 className="font-semibold text-zinc-300 text-sm uppercase tracking-wide">Challenge đang diễn ra</h3>
+          {ongoingChallenges.length === 0 ? (
+            <p className="text-zinc-500 text-sm">Không có challenge nào đang diễn ra</p>
+          ) : (
+            ongoingChallenges.map(c => (
+              <div key={c.id} className="card p-4">
                 <div className="flex items-center gap-3">
-                  <div className={`w-2 h-2 rounded-full ${ongoing ? 'bg-emerald-500' : 'bg-zinc-600'}`} />
+                  <div className="w-2 h-2 rounded-full bg-emerald-500" />
                   <div>
                     <p className="font-medium">{c.name}</p>
-                    <div className="flex items-center gap-2 mt-0.5">
-                      {!ongoing && <span className="text-xs text-zinc-500">Không đang diễn ra</span>}
-                      {ongoing && !hasClub && (
-                        <span className="text-xs text-amber-400 flex items-center gap-1">
-                          <AlertTriangle className="w-3 h-3" /> Chưa có Strava Club ID
-                        </span>
-                      )}
-                      {ongoing && hasClub && <span className="text-xs text-zinc-500">CLB: {c.stravaClubId}</span>}
-                    </div>
+                    {c.stravaClubId ? (
+                      <p className="text-xs text-zinc-500">Club ID: {c.stravaClubId}</p>
+                    ) : (
+                      <p className="text-xs text-amber-400 flex items-center gap-1">
+                        <AlertTriangle className="w-3 h-3" /> Chưa có Strava Club ID — vào <a href="/admin/challenges" className="underline">Thử thách</a> để cấu hình
+                      </p>
+                    )}
                   </div>
                 </div>
-                <button
-                  onClick={() => scrapeChallenge(c.id)}
-                  disabled={!canScrape || isSyncing}
-                  title={!ongoing ? 'Challenge không đang diễn ra' : !hasClub ? 'Chưa cấu hình Club ID' : ''}
-                  className="btn-secondary flex items-center gap-2 text-sm disabled:opacity-40 disabled:cursor-not-allowed"
-                >
-                  <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
-                  {isSyncing ? 'Đang cào...' : 'Cào ngay'}
-                </button>
               </div>
-            </div>
-          )
-        })}
-        {challenges.length === 0 && <p className="text-zinc-500 text-sm text-center py-8">Chưa có thử thách nào</p>}
-      </div>
+            ))
+          )}
+        </div>
+      )}
 
       {/* Scrape history */}
       <div>
@@ -188,22 +189,23 @@ export default function AdminSyncPage() {
         )}
       </div>
 
-      <div className="card p-5">
-        <h3 className="font-semibold mb-2">⏱ Auto Cào (Vercel Cron)</h3>
+      {/* Secrets guide */}
+      <div className="card p-5 border-zinc-700">
+        <h3 className="font-semibold mb-3">🔑 GitHub Secrets cần cấu hình</h3>
         <p className="text-zinc-400 text-sm mb-3">
-          File <code className="bg-zinc-800 px-1.5 py-0.5 rounded text-orange-400 text-xs">vercel.json</code> đã cấu hình 2 cron job:
+          Vào <strong>GitHub repo → Settings → Secrets and variables → Actions</strong> và thêm:
         </p>
-        <pre className="bg-zinc-800 rounded-lg p-4 text-xs text-zinc-300 overflow-x-auto">
-{`{
-  "crons": [
-    { "path": "/api/cron/sync", "schedule": "0 1 * * *" },
-    { "path": "/api/cron/sync", "schedule": "0 13 * * *" }
-  ]
-}`}
-        </pre>
-        <p className="text-zinc-500 text-xs mt-2">
-          Chạy lúc 8:00 và 20:00 giờ Việt Nam. Thêm biến <code className="text-orange-400">CRON_SECRET</code> trên Vercel để bảo vệ endpoint.
-        </p>
+        <div className="space-y-2">
+          {[
+            { name: 'APP_BASE_URL', desc: 'URL Vercel app, ví dụ: https://your-app.vercel.app' },
+            { name: 'SCRAPE_IMPORT_SECRET', desc: 'Chuỗi bí mật tự đặt, khớp với biến trong Vercel' },
+          ].map(s => (
+            <div key={s.name} className="flex items-start gap-3 bg-zinc-800/50 rounded p-3">
+              <code className="text-orange-400 text-sm font-mono shrink-0">{s.name}</code>
+              <span className="text-zinc-400 text-sm">{s.desc}</span>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   )

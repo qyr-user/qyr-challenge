@@ -1,0 +1,44 @@
+name: Strava Scraper
+
+on:
+  schedule:
+    # 8:00 VN (01:00 UTC)
+    - cron: '0 1 * * *'
+    # 20:00 VN (13:00 UTC)
+    - cron: '0 13 * * *'
+    # 23:50 VN (16:50 UTC)
+    - cron: '50 16 * * *'
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: 'Lý do chạy thủ công'
+        required: false
+        default: 'Manual trigger'
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Chrome
+        uses: browser-actions/setup-chrome@v1
+        with:
+          chrome-version: stable
+
+      - name: Install Python dependencies
+        run: pip install selenium webdriver-manager
+
+      - name: Run Strava scraper
+        env:
+          APP_BASE_URL: ${{ secrets.APP_BASE_URL }}
+          SCRAPE_IMPORT_SECRET: ${{ secrets.SCRAPE_IMPORT_SECRET }}
+        run: python strava_club_scraper.py
