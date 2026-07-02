@@ -2,12 +2,14 @@ name: Strava Scraper
 
 on:
   schedule:
-    # 8:00 VN (01:00 UTC)
-    - cron: '0 1 * * *'
-    # 20:00 VN (13:00 UTC)
-    - cron: '0 13 * * *'
-    # 23:50 VN (16:50 UTC)
-    - cron: '50 16 * * *'
+    - cron: '0 0 * * *'   # 07:00 VN
+    - cron: '0 1 * * *'   # 08:00 VN
+    - cron: '0 3 * * *'   # 10:00 VN
+    - cron: '0 11 * * *'  # 18:00 VN
+    - cron: '30 12 * * *' # 19:30 VN
+    - cron: '0 13 * * *'  # 20:00 VN
+    - cron: '0 15 * * *'  # 22:00 VN
+    - cron: '0 16 * * *'  # 23:00 VN
   workflow_dispatch:
     inputs:
       reason:
