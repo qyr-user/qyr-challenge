@@ -1,6 +1,8 @@
 import prisma from '@/app/lib/prisma'
 import { notFound } from 'next/navigation'
 import { LeaderboardList } from '@/app/components/user/LeaderboardList'
+import { MemberCompletionStatusModal } from '@/app/components/user/MemberCompletionStatusModal'
+import { evaluateChallengeCompletion } from '@/app/lib/challenge-rules'
 import { formatDate } from '@/app/lib/utils'
 import { Calendar, Users, Trophy, Medal, Flame, ArrowLeft } from 'lucide-react'
 import Link from 'next/link'
@@ -35,11 +37,64 @@ async function getLeaderboard(challengeId: number) {
     .map((t, i) => ({ ...t, rank: i + 1 }))
 }
 
+async function getMemberStatuses(challengeId: number) {
+  const challenge = await prisma.challenge.findUnique({ where: { id: challengeId } })
+  if (!challenge) return []
+
+  const challengeRules = {
+    ...challenge,
+    minTotalKmMale: (challenge as { minTotalKmMale?: number | null }).minTotalKmMale ?? null,
+    minTotalKmFemale: (challenge as { minTotalKmFemale?: number | null }).minTotalKmFemale ?? null,
+  }
+
+  const teamMembers = await prisma.teamMember.findMany({
+    where: { team: { challengeId } },
+    include: {
+      athlete: {
+        include: {
+          activities: {
+            where: { challengeId },
+            select: { activityDate: true, distanceKm: true, isValid: true },
+          },
+        },
+      },
+    },
+  })
+
+  const uniqueAthletes = new Map(teamMembers.map(tm => [tm.athlete.id, tm.athlete]))
+
+  return Array.from(uniqueAthletes.values())
+    .map(athlete => {
+      const result = evaluateChallengeCompletion({
+        challenge: challengeRules,
+        athleteGender: (athlete as { gender?: 'MALE' | 'FEMALE' }).gender ?? 'MALE',
+        activities: athlete.activities,
+      })
+
+      const reasons = [...result.reasons]
+      if (result.failedDays.length > 0) {
+        reasons.push(`Ngày chưa đạt min/day: ${result.failedDays.join(', ')}`)
+      }
+      if (result.failedWeeks.length > 0) {
+        reasons.push(`Tuần chưa đạt min/week: ${result.failedWeeks.join(', ')}`)
+      }
+
+      return {
+        athleteId: athlete.id,
+        name: athlete.name,
+        completed: result.completed,
+        reasons,
+      }
+    })
+    .sort((a, b) => a.name.localeCompare(b.name, 'vi'))
+}
+
 export default async function ChallengePage({ params }: { params: { id: string } }) {
   const challenge = await prisma.challenge.findUnique({ where: { id: Number(params.id) } })
   if (!challenge) notFound()
 
   const leaderboard = await getLeaderboard(Number(params.id))
+  const memberStatuses = await getMemberStatuses(Number(params.id))
   const now = new Date()
   const isActive = now >= challenge.startDate && now <= challenge.endDate
   const isUpcoming = now < challenge.startDate
@@ -83,6 +138,8 @@ export default async function ChallengePage({ params }: { params: { id: string }
                 <Flame className="w-4 h-4 text-zinc-600" />
                 <span>{leaderboard.reduce((s, t) => s + t.totalKm, 0).toFixed(1)} km tổng cộng</span>
               </div>
+              <MemberCompletionStatusModal statuses={memberStatuses} />
+              
             </div>
           </div>
         </div>
