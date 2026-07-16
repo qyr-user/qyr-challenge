@@ -557,7 +557,7 @@ export default function AdminMembersPage() {
 
               {statusReason.failedWeeks.length > 0 && (
                 <div>
-                  <p className="text-zinc-300 font-medium mb-1">Tuần chưa đạt minActivitiesPerWeek</p>
+                  <p className="text-zinc-300 font-medium mb-1">Tuần chưa đạt số lần chạy tối thiểu</p>
                   <ul className="list-disc ml-5 text-zinc-400 space-y-1">
                     {statusReason.failedWeeks.map((w, idx) => <li key={`${w}-${idx}`}>{w}</li>)}
                   </ul>

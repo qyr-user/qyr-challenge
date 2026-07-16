@@ -156,7 +156,7 @@ export function evaluateChallengeCompletion(params: {
       }
     }
     if (failedDays.length) {
-      reasons.push(`Không đạt minActivitiesPerDay ở ${failedDays.length} ngày`)
+      reasons.push(`Không đạt số lần chạy tối thiểu trên ngày ở ${failedDays.length} ngày`)
     }
   }
 
@@ -174,7 +174,7 @@ export function evaluateChallengeCompletion(params: {
       }
     }
     if (failedWeeks.length) {
-      reasons.push(`Không đạt minActivitiesPerWeek ở ${failedWeeks.length} tuần`)
+      reasons.push(`Không đạt số lần chạy tối thiểu trên tuần ở ${failedWeeks.length} tuần`)
     }
   }
 

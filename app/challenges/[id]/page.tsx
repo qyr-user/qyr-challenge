@@ -73,10 +73,10 @@ async function getMemberStatuses(challengeId: number) {
 
       const reasons = [...result.reasons]
       if (result.failedDays.length > 0) {
-        reasons.push(`Ngày chưa đạt min/day: ${result.failedDays.join(', ')}`)
+        reasons.push(`Ngày chưa đạt số lần chạy tối thiểu: ${result.failedDays.join(', ')}`)
       }
       if (result.failedWeeks.length > 0) {
-        reasons.push(`Tuần chưa đạt min/week: ${result.failedWeeks.join(', ')}`)
+        reasons.push(`Tuần chưa đạt số lần chạy tối thiểu: ${result.failedWeeks.join(', ')}`)
       }
 
       return {
