@@ -20,6 +20,16 @@ export default function AdminMembersPage() {
   const [loading, setLoading] = useState<string | null>(null)
   const [newName, setNewName] = useState('')
   const [creating, setCreating] = useState(false)
+  const [showManualModal, setShowManualModal] = useState(false)
+  const [manualForm, setManualForm] = useState({
+    athleteId: 0,
+    athleteName: '',
+    challengeId: 0,
+    activityDate: new Date().toISOString().slice(0, 10),
+    name: '',
+    distanceKm: '',
+    movingTime: '',
+  })
 
   useEffect(() => {
     fetch('/api/athletes').then(r => r.json()).then(setAthletes)
@@ -109,6 +119,74 @@ export default function AdminMembersPage() {
     }
   }
 
+  function openManualModal(athlete: Athlete) {
+    if (!selectedChallenge) {
+      toast.error('Vui lòng chọn thử thách trước')
+      return
+    }
+
+    const currentTeam = getAthleteTeamInChallenge(athlete, selectedChallenge)
+    if (!currentTeam) {
+      toast.error('VĐV chưa có nhóm trong thử thách này')
+      return
+    }
+
+    setManualForm({
+      athleteId: athlete.id,
+      athleteName: athlete.name,
+      challengeId: Number(selectedChallenge),
+      activityDate: new Date().toISOString().slice(0, 10),
+      name: '',
+      distanceKm: '',
+      movingTime: '',
+    })
+    setShowManualModal(true)
+  }
+
+  async function submitManualActivity(e: React.FormEvent) {
+    e.preventDefault()
+    if (!manualForm.name.trim() || !manualForm.distanceKm.trim() || !manualForm.movingTime.trim()) {
+      toast.error('Vui lòng nhập đầy đủ thông tin')
+      return
+    }
+
+    setLoading(`manual-${manualForm.athleteId}`)
+    try {
+      const res = await fetch('/api/activities/manual', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          athleteId: manualForm.athleteId,
+          challengeId: manualForm.challengeId,
+          activityDate: manualForm.activityDate,
+          name: manualForm.name.trim(),
+          distanceKm: Number(manualForm.distanceKm),
+          movingTime: manualForm.movingTime.trim(),
+        }),
+      })
+
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        toast.error(data.error || 'Không thể lưu hoạt động')
+        return
+      }
+
+      toast.success('Đã lưu hoạt động thủ công')
+      setShowManualModal(false)
+      setManualForm({
+        athleteId: 0,
+        athleteName: '',
+        challengeId: 0,
+        activityDate: new Date().toISOString().slice(0, 10),
+        name: '',
+        distanceKm: '',
+        movingTime: '',
+      })
+    } finally {
+      setLoading(null)
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div>
@@ -152,6 +230,7 @@ export default function AdminMembersPage() {
                 <th className="text-left px-4 py-3">Vận động viên</th>
                 <th className="text-left px-4 py-3">{selectedChallenge ? 'Nhóm hiện tại' : 'Nhóm tham gia'}</th>
                 {selectedChallenge && <th className="text-left px-4 py-3">Phân nhóm</th>}
+                {selectedChallenge && <th className="text-left px-4 py-3">Nhập hđ thủ công</th>}
                 <th className="px-4 py-3"></th>
               </tr>
             </thead>
@@ -211,6 +290,17 @@ export default function AdminMembersPage() {
                         </select>
                       </td>
                     )}
+                    {selectedChallenge && (
+                      <td className="px-4 py-3">
+                        <button
+                          onClick={() => openManualModal(athlete)}
+                          className="btn-secondary text-xs py-1.5"
+                          disabled={!!loading}
+                        >
+                          Nhập hđ
+                        </button>
+                      </td>
+                    )}
                     <td className="px-4 py-3">
                       <button onClick={() => deleteAthlete(athlete.id, athlete.name)} className="text-zinc-600 hover:text-red-400 transition-colors">
                         <Trash2 className="w-4 h-4" />
@@ -230,6 +320,78 @@ export default function AdminMembersPage() {
           )}
         </div>
       </div>
+
+      {showManualModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
+          <div className="card w-full max-w-lg p-6">
+            <h3 className="text-lg font-semibold mb-1">Nhập hoạt động thủ công</h3>
+            <p className="text-sm text-zinc-500 mb-4">VĐV: {manualForm.athleteName}</p>
+
+            <form onSubmit={submitManualActivity} className="space-y-4">
+              <div>
+                <label className="label">Ngày</label>
+                <input
+                  className="input"
+                  type="date"
+                  value={manualForm.activityDate}
+                  onChange={e => setManualForm(prev => ({ ...prev, activityDate: e.target.value }))}
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="label">Tên hoạt động chạy</label>
+                <input
+                  className="input"
+                  value={manualForm.name}
+                  onChange={e => setManualForm(prev => ({ ...prev, name: e.target.value }))}
+                  placeholder="VD: Morning Run"
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="label">Khoảng cách (km)</label>
+                  <input
+                    className="input"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={manualForm.distanceKm}
+                    onChange={e => setManualForm(prev => ({ ...prev, distanceKm: e.target.value }))}
+                    placeholder="VD: 5.5"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="label">Thời gian</label>
+                  <input
+                    className="input"
+                    value={manualForm.movingTime}
+                    onChange={e => setManualForm(prev => ({ ...prev, movingTime: e.target.value }))}
+                    placeholder="VD: 45:30 hoặc 2730"
+                    required
+                  />
+                </div>
+              </div>
+
+              <p className="text-xs text-zinc-500">
+                Định dạng thời gian: giây hoặc mm:ss hoặc hh:mm:ss. Hệ thống sẽ tự tính pace và kiểm tra hợp lệ theo challenge.
+              </p>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <button type="button" className="btn-secondary" onClick={() => setShowManualModal(false)}>
+                  Hủy
+                </button>
+                <button type="submit" className="btn-primary" disabled={!!loading}>
+                  {loading === `manual-${manualForm.athleteId}` ? 'Đang lưu...' : 'Lưu hoạt động'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
