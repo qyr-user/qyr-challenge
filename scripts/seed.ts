@@ -23,6 +23,7 @@ async function main() {
       startDate: new Date('2026-07-01T00:00:00+07:00'),
       endDate: new Date('2026-07-31T23:59:59+07:00'),
       stravaClubId: '2224942',
+      minKmPerActivity: 1,
       maxKmPerActivity: 42,
       minPaceSeconds: 240,
       maxPaceSeconds: 600,

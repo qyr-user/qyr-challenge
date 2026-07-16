@@ -51,6 +51,10 @@ export async function POST(req: NextRequest) {
     // Validate against challenge rules
     let isValid = true
     const reasons: string[] = []
+    if (challenge.minKmPerActivity && act.distanceKm < challenge.minKmPerActivity) {
+      isValid = false
+      reasons.push(`Dưới ${challenge.minKmPerActivity}km/lần`)
+    }
     if (challenge.maxKmPerActivity && act.distanceKm > challenge.maxKmPerActivity) {
       isValid = false
       reasons.push(`Vượt quá ${challenge.maxKmPerActivity}km/lần`)

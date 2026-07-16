@@ -9,7 +9,7 @@ interface Challenge {
   isActive: boolean; stravaClubId?: string
   maxActivitiesPerDay?: number; minActivitiesPerDay?: number
   maxActivitiesPerWeek?: number; minActivitiesPerWeek?: number
-  maxKmPerActivity?: number; minPaceSeconds?: number; maxPaceSeconds?: number
+  minKmPerActivity?: number; maxKmPerActivity?: number; minPaceSeconds?: number; maxPaceSeconds?: number
   _count?: { teams: number }
 }
 
@@ -17,7 +17,7 @@ const defaultForm = {
   name: '', description: '', startDate: '', endDate: '', stravaClubId: '',
   maxActivitiesPerDay: '', minActivitiesPerDay: '',
   maxActivitiesPerWeek: '', minActivitiesPerWeek: '',
-  maxKmPerActivity: '', minPaceStr: '', maxPaceStr: '',
+  minKmPerActivity: '', maxKmPerActivity: '', minPaceStr: '', maxPaceStr: '',
 }
 
 // Convert UTC ISO string → "YYYY-MM-DDTHH:mm" in UTC+7 for datetime-local input
@@ -72,6 +72,7 @@ export default function AdminChallengesPage() {
       minActivitiesPerDay: c.minActivitiesPerDay?.toString() || '',
       maxActivitiesPerWeek: c.maxActivitiesPerWeek?.toString() || '',
       minActivitiesPerWeek: c.minActivitiesPerWeek?.toString() || '',
+      minKmPerActivity: c.minKmPerActivity?.toString() || '',
       maxKmPerActivity: c.maxKmPerActivity?.toString() || '',
       minPaceStr: secondsToPace(c.minPaceSeconds),
       maxPaceStr: secondsToPace(c.maxPaceSeconds),
@@ -169,6 +170,10 @@ export default function AdminChallengesPage() {
                 <input className="input" type="number" min="0" placeholder="--" {...f('maxActivitiesPerWeek')} />
               </div>
               <div>
+                <label className="label">Min km/hoạt động</label>
+                <input className="input" type="number" step="0.1" min="0" placeholder="--" {...f('minKmPerActivity')} />
+              </div>
+              <div>
                 <label className="label">Max km/hoạt động</label>
                 <input className="input" type="number" step="0.1" min="0" placeholder="--" {...f('maxKmPerActivity')} />
               </div>
@@ -218,6 +223,7 @@ export default function AdminChallengesPage() {
             {expanded === c.id && (
               <div className="border-t border-zinc-800 p-4 grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
                 {[
+                  ['Min km/act', c.minKmPerActivity ? `${c.minKmPerActivity} km` : '--'],
                   ['Max km/act', c.maxKmPerActivity ? `${c.maxKmPerActivity} km` : '--'],
                   ['Pace nhanh nhất', c.minPaceSeconds ? `${secondsToPace(c.minPaceSeconds)}/km` : '--'],
                   ['Pace chậm nhất', c.maxPaceSeconds ? `${secondsToPace(c.maxPaceSeconds)}/km` : '--'],

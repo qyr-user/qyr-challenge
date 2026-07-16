@@ -349,12 +349,17 @@ function parseJsonFeedEntries(entries: unknown[], logs: string[]): ScrapedActivi
 export function validateActivityAgainstChallenge(
   activity: ScrapedActivity,
   challenge: {
+    minKmPerActivity?: number | null
     maxKmPerActivity?: number | null
     minPaceSeconds?: number | null
     maxPaceSeconds?: number | null
   }
 ): { isValid: boolean; invalidReason: string | null } {
   const reasons: string[] = []
+
+  if (challenge.minKmPerActivity && activity.distanceKm < challenge.minKmPerActivity) {
+    reasons.push(`Dưới ${challenge.minKmPerActivity}km/lần`)
+  }
 
   if (challenge.maxKmPerActivity && activity.distanceKm > challenge.maxKmPerActivity) {
     reasons.push(`Vượt quá ${challenge.maxKmPerActivity}km/lần`)

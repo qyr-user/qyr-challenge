@@ -35,6 +35,7 @@ model Challenge {
   minActivitiesPerDay  Int?
   maxActivitiesPerWeek Int?
   minActivitiesPerWeek Int?
+  minKmPerActivity     Float?
   maxKmPerActivity     Float?
   minPaceSeconds       Int?
   maxPaceSeconds       Int?
