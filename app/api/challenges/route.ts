@@ -29,6 +29,8 @@ export async function POST(req: NextRequest) {
       minActivitiesPerDay: body.minActivitiesPerDay ? Number(body.minActivitiesPerDay) : null,
       maxActivitiesPerWeek: body.maxActivitiesPerWeek ? Number(body.maxActivitiesPerWeek) : null,
       minActivitiesPerWeek: body.minActivitiesPerWeek ? Number(body.minActivitiesPerWeek) : null,
+      minTotalKmMale: body.minTotalKmMale ? Number(body.minTotalKmMale) : null,
+      minTotalKmFemale: body.minTotalKmFemale ? Number(body.minTotalKmFemale) : null,
       minKmPerActivity: body.minKmPerActivity ? Number(body.minKmPerActivity) : null,
       maxKmPerActivity: body.maxKmPerActivity ? Number(body.maxKmPerActivity) : null,
       minPaceSeconds: body.minPaceSeconds ? Number(body.minPaceSeconds) : null,

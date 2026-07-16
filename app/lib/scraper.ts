@@ -1,5 +1,6 @@
 import * as cheerio from 'cheerio'
 import prisma from './prisma'
+import { validateActivityWithChallengeRules } from './challenge-rules'
 
 export interface ScrapedActivity {
   athleteName: string
@@ -469,7 +470,13 @@ export async function runScrapeForChallenge(
         continue
       }
 
-      const { isValid, invalidReason } = validateActivityAgainstChallenge(act, challenge)
+      const { isValid, invalidReason } = await validateActivityWithChallengeRules({
+        athleteId: athlete.id,
+        challenge,
+        distanceKm: act.distanceKm,
+        paceSeconds: act.paceSeconds,
+        activityDate: today,
+      })
       logs.push(`[run] ✓ Lưu: "${act.athleteName}" | ${act.distanceKm}km | valid=${isValid}`)
 
       try {

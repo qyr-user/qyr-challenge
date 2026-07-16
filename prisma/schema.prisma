@@ -35,6 +35,8 @@ model Challenge {
   minActivitiesPerDay  Int?
   maxActivitiesPerWeek Int?
   minActivitiesPerWeek Int?
+  minTotalKmMale       Float?
+  minTotalKmFemale     Float?
   minKmPerActivity     Float?
   maxKmPerActivity     Float?
   minPaceSeconds       Int?
@@ -45,6 +47,11 @@ model Challenge {
   teams      Team[]
   activities Activity[]
   scrapeLogs ScrapeLog[]
+}
+
+enum AthleteGender {
+  MALE
+  FEMALE
 }
 
 model ScrapeLog {
@@ -75,6 +82,7 @@ model Team {
 model Athlete {
   id        Int      @id @default(autoincrement())
   name      String   @unique
+  gender    AthleteGender @default(MALE)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

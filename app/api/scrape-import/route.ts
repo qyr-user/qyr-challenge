@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/app/lib/prisma'
+import { validateActivityWithChallengeRules } from '@/app/lib/challenge-rules'
 
 interface IncomingActivity {
   athleteName: string
@@ -48,29 +49,13 @@ export async function POST(req: NextRequest) {
       continue
     }
 
-    // Validate against challenge rules
-    let isValid = true
-    const reasons: string[] = []
-    if (challenge.minKmPerActivity && act.distanceKm < challenge.minKmPerActivity) {
-      isValid = false
-      reasons.push(`Dưới ${challenge.minKmPerActivity}km/lần`)
-    }
-    if (challenge.maxKmPerActivity && act.distanceKm > challenge.maxKmPerActivity) {
-      isValid = false
-      reasons.push(`Vượt quá ${challenge.maxKmPerActivity}km/lần`)
-    }
-    if (act.paceSeconds) {
-      if (challenge.minPaceSeconds && act.paceSeconds < challenge.minPaceSeconds) {
-        isValid = false
-        const m = Math.floor(challenge.minPaceSeconds / 60), s = challenge.minPaceSeconds % 60
-        reasons.push(`Pace nhanh hơn ${m}:${s.toString().padStart(2, '0')}/km`)
-      }
-      if (challenge.maxPaceSeconds && act.paceSeconds > challenge.maxPaceSeconds) {
-        isValid = false
-        const m = Math.floor(challenge.maxPaceSeconds / 60), s = challenge.maxPaceSeconds % 60
-        reasons.push(`Pace chậm hơn ${m}:${s.toString().padStart(2, '0')}/km`)
-      }
-    }
+    const { isValid, invalidReason } = await validateActivityWithChallengeRules({
+      athleteId: athlete.id,
+      challenge,
+      distanceKm: act.distanceKm,
+      paceSeconds: act.paceSeconds ?? null,
+      activityDate: today,
+    })
 
     try {
       await prisma.activity.create({
@@ -83,7 +68,7 @@ export async function POST(req: NextRequest) {
           movingTime: act.movingTime,
           paceSeconds: act.paceSeconds ?? null,
           isValid,
-          invalidReason: reasons.length > 0 ? reasons.join('; ') : null,
+          invalidReason,
         },
       })
       saved++

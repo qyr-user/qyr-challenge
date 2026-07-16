@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdminFromRequest } from '@/app/lib/admin-auth'
 import prisma from '@/app/lib/prisma'
-import { validateActivityAgainstChallenge } from '@/app/lib/scraper'
+import { calculatePaceSeconds, validateActivityWithChallengeRules } from '@/app/lib/challenge-rules'
 
 function parseDurationToSeconds(value: string): number {
   const v = value.trim()
@@ -23,11 +23,6 @@ function parseDurationToSeconds(value: string): number {
   }
 
   return 0
-}
-
-function calculatePaceSeconds(distanceKm: number, movingTime: number): number | null {
-  if (!distanceKm || !movingTime) return null
-  return Math.round(movingTime / distanceKm)
 }
 
 export async function POST(req: NextRequest) {
@@ -69,17 +64,13 @@ export async function POST(req: NextRequest) {
   }
 
   const paceSeconds = calculatePaceSeconds(distanceKm, movingTime)
-  const { isValid, invalidReason } = validateActivityAgainstChallenge(
-    {
-      athleteName: athlete.name,
-      activityName,
-      distanceKm,
-      movingTime,
-      paceSeconds,
-      activityDate,
-    },
-    challenge
-  )
+  const { isValid, invalidReason } = await validateActivityWithChallengeRules({
+    athleteId,
+    challenge,
+    distanceKm,
+    paceSeconds,
+    activityDate,
+  })
 
   try {
     const activity = await prisma.activity.create({

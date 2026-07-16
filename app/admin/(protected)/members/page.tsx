@@ -1,15 +1,22 @@
 'use client'
 import { useState, useEffect } from 'react'
-import { UserX, Search, Users, Plus, Trash2 } from 'lucide-react'
+import { UserX, Search, Users, Plus, Trash2, Pencil, CheckCircle2, XCircle } from 'lucide-react'
 import { toast } from 'sonner'
 import { getInitials } from '@/app/lib/utils'
 
 interface Athlete {
-  id: number; name: string
+  id: number; name: string; gender: 'MALE' | 'FEMALE'
   teamMembers: Array<{ team: { id: number; name: string; challenge: { id: number; name: string } } }>
 }
 interface Team { id: number; name: string; challengeId: number }
 interface Challenge { id: number; name: string }
+interface AthleteStatus {
+  athleteId: number
+  completed: boolean
+  reasons: string[]
+  failedDays: string[]
+  failedWeeks: string[]
+}
 
 export default function AdminMembersPage() {
   const [athletes, setAthletes] = useState<Athlete[]>([])
@@ -19,8 +26,13 @@ export default function AdminMembersPage() {
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState<string | null>(null)
   const [newName, setNewName] = useState('')
+  const [newGender, setNewGender] = useState<'MALE' | 'FEMALE'>('MALE')
   const [creating, setCreating] = useState(false)
+  const [editingAthlete, setEditingAthlete] = useState<Athlete | null>(null)
+  const [editForm, setEditForm] = useState({ name: '', gender: 'MALE' as 'MALE' | 'FEMALE' })
   const [showManualModal, setShowManualModal] = useState(false)
+  const [statusMap, setStatusMap] = useState<Record<number, AthleteStatus>>({})
+  const [statusReason, setStatusReason] = useState<AthleteStatus | null>(null)
   const [manualForm, setManualForm] = useState({
     athleteId: 0,
     athleteName: '',
@@ -37,6 +49,22 @@ export default function AdminMembersPage() {
     fetch('/api/challenges').then(r => r.json()).then(setChallenges)
   }, [])
 
+  useEffect(() => {
+    if (!selectedChallenge) {
+      setStatusMap({})
+      return
+    }
+
+    fetch(`/api/challenges/${selectedChallenge}/athlete-status`)
+      .then(r => r.json())
+      .then((rows: AthleteStatus[]) => {
+        const next: Record<number, AthleteStatus> = {}
+        for (const row of rows) next[row.athleteId] = row
+        setStatusMap(next)
+      })
+      .catch(() => setStatusMap({}))
+  }, [selectedChallenge, athletes])
+
   async function refreshAthletes() {
     const updated = await fetch('/api/athletes').then(r => r.json())
     setAthletes(updated)
@@ -50,7 +78,7 @@ export default function AdminMembersPage() {
       const res = await fetch('/api/athletes', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: newName.trim() }),
+        body: JSON.stringify({ name: newName.trim(), gender: newGender }),
       })
       if (!res.ok) {
         const d = await res.json()
@@ -59,6 +87,7 @@ export default function AdminMembersPage() {
       }
       toast.success('Đã tạo vận động viên')
       setNewName('')
+      setNewGender('MALE')
       await refreshAthletes()
     } finally {
       setCreating(false)
@@ -114,6 +143,37 @@ export default function AdminMembersPage() {
       await refreshAthletes()
     } catch {
       toast.error('Lỗi xảy ra')
+    } finally {
+      setLoading(null)
+    }
+  }
+
+  function openEditAthlete(athlete: Athlete) {
+    setEditingAthlete(athlete)
+    setEditForm({ name: athlete.name, gender: athlete.gender })
+  }
+
+  async function submitEditAthlete(e: React.FormEvent) {
+    e.preventDefault()
+    if (!editingAthlete) return
+
+    setLoading(`edit-${editingAthlete.id}`)
+    try {
+      const res = await fetch('/api/athletes', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: editingAthlete.id, name: editForm.name.trim(), gender: editForm.gender }),
+      })
+
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        toast.error(data.error || 'Không thể cập nhật VĐV')
+        return
+      }
+
+      toast.success('Đã cập nhật vận động viên')
+      setEditingAthlete(null)
+      await refreshAthletes()
     } finally {
       setLoading(null)
     }
@@ -202,6 +262,10 @@ export default function AdminMembersPage() {
           value={newName}
           onChange={e => setNewName(e.target.value)}
         />
+        <select className="input w-36" value={newGender} onChange={e => setNewGender(e.target.value as 'MALE' | 'FEMALE')}>
+          <option value="MALE">Nam</option>
+          <option value="FEMALE">Nữ</option>
+        </select>
         <button type="submit" disabled={creating} className="btn-primary flex items-center gap-2 shrink-0">
           <Plus className="w-4 h-4" />
           Thêm VĐV
@@ -228,9 +292,11 @@ export default function AdminMembersPage() {
             <thead>
               <tr className="border-b border-zinc-800 text-zinc-500 text-xs">
                 <th className="text-left px-4 py-3">Vận động viên</th>
+                <th className="text-left px-4 py-3">Giới tính</th>
                 <th className="text-left px-4 py-3">{selectedChallenge ? 'Nhóm hiện tại' : 'Nhóm tham gia'}</th>
                 {selectedChallenge && <th className="text-left px-4 py-3">Phân nhóm</th>}
                 {selectedChallenge && <th className="text-left px-4 py-3">Nhập hđ thủ công</th>}
+                {selectedChallenge && <th className="text-left px-4 py-3">Trạng thái</th>}
                 <th className="px-4 py-3"></th>
               </tr>
             </thead>
@@ -248,6 +314,11 @@ export default function AdminMembersPage() {
                         </div>
                         <span className="font-medium">{athlete.name}</span>
                       </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className="text-xs px-2 py-1 rounded border border-zinc-700 text-zinc-300">
+                        {athlete.gender === 'FEMALE' ? 'Nữ' : 'Nam'}
+                      </span>
                     </td>
                     <td className="px-4 py-3">
                       {selectedChallenge ? (
@@ -301,10 +372,42 @@ export default function AdminMembersPage() {
                         </button>
                       </td>
                     )}
+                    {selectedChallenge && (
+                      <td className="px-4 py-3">
+                        {currentTeam ? (
+                          (() => {
+                            const s = statusMap[athlete.id]
+                            if (!s) return <span className="text-xs text-zinc-500">Đang tính...</span>
+                            if (s.completed) {
+                              return (
+                                <span className="inline-flex items-center gap-1 text-emerald-400 text-xs font-medium">
+                                  <CheckCircle2 className="w-4 h-4" /> Hoàn thành
+                                </span>
+                              )
+                            }
+                            return (
+                              <button
+                                onClick={() => setStatusReason(s)}
+                                className="inline-flex items-center gap-1 text-red-400 text-xs font-medium hover:text-red-300"
+                              >
+                                <XCircle className="w-4 h-4" /> Chưa hoàn thành
+                              </button>
+                            )
+                          })()
+                        ) : (
+                          <span className="text-xs text-zinc-600">--</span>
+                        )}
+                      </td>
+                    )}
                     <td className="px-4 py-3">
-                      <button onClick={() => deleteAthlete(athlete.id, athlete.name)} className="text-zinc-600 hover:text-red-400 transition-colors">
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                      <div className="flex items-center gap-2 justify-end">
+                        <button onClick={() => openEditAthlete(athlete)} className="text-zinc-500 hover:text-zinc-300 transition-colors">
+                          <Pencil className="w-4 h-4" />
+                        </button>
+                        <button onClick={() => deleteAthlete(athlete.id, athlete.name)} className="text-zinc-600 hover:text-red-400 transition-colors">
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 )
@@ -389,6 +492,81 @@ export default function AdminMembersPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {editingAthlete && (
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
+          <div className="card w-full max-w-md p-6">
+            <h3 className="text-lg font-semibold mb-4">Chỉnh sửa vận động viên</h3>
+            <form onSubmit={submitEditAthlete} className="space-y-4">
+              <div>
+                <label className="label">Tên VĐV</label>
+                <input
+                  className="input"
+                  value={editForm.name}
+                  onChange={e => setEditForm(prev => ({ ...prev, name: e.target.value }))}
+                  required
+                />
+              </div>
+              <div>
+                <label className="label">Giới tính</label>
+                <select
+                  className="input"
+                  value={editForm.gender}
+                  onChange={e => setEditForm(prev => ({ ...prev, gender: e.target.value as 'MALE' | 'FEMALE' }))}
+                >
+                  <option value="MALE">Nam</option>
+                  <option value="FEMALE">Nữ</option>
+                </select>
+              </div>
+              <div className="flex justify-end gap-2">
+                <button type="button" className="btn-secondary" onClick={() => setEditingAthlete(null)}>Hủy</button>
+                <button type="submit" className="btn-primary" disabled={loading === `edit-${editingAthlete.id}`}>
+                  {loading === `edit-${editingAthlete.id}` ? 'Đang lưu...' : 'Lưu'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {statusReason && (
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
+          <div className="card w-full max-w-2xl p-6 max-h-[85vh] overflow-auto">
+            <h3 className="text-lg font-semibold mb-3 text-red-400">Lý do chưa hoàn thành</h3>
+            <div className="space-y-3 text-sm">
+              {statusReason.reasons.length > 0 && (
+                <div>
+                  <p className="text-zinc-300 font-medium mb-1">Tổng quan</p>
+                  <ul className="list-disc ml-5 text-zinc-400 space-y-1">
+                    {statusReason.reasons.map((r, idx) => <li key={`${r}-${idx}`}>{r}</li>)}
+                  </ul>
+                </div>
+              )}
+
+              {statusReason.failedDays.length > 0 && (
+                <div>
+                  <p className="text-zinc-300 font-medium mb-1">Ngày chưa đạt minActivitiesPerDay</p>
+                  <ul className="list-disc ml-5 text-zinc-400 space-y-1">
+                    {statusReason.failedDays.map((d, idx) => <li key={`${d}-${idx}`}>{d}</li>)}
+                  </ul>
+                </div>
+              )}
+
+              {statusReason.failedWeeks.length > 0 && (
+                <div>
+                  <p className="text-zinc-300 font-medium mb-1">Tuần chưa đạt minActivitiesPerWeek</p>
+                  <ul className="list-disc ml-5 text-zinc-400 space-y-1">
+                    {statusReason.failedWeeks.map((w, idx) => <li key={`${w}-${idx}`}>{w}</li>)}
+                  </ul>
+                </div>
+              )}
+            </div>
+            <div className="flex justify-end mt-5">
+              <button className="btn-secondary" onClick={() => setStatusReason(null)}>Đóng</button>
+            </div>
           </div>
         </div>
       )}

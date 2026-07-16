@@ -9,6 +9,7 @@ interface Challenge {
   isActive: boolean; stravaClubId?: string
   maxActivitiesPerDay?: number; minActivitiesPerDay?: number
   maxActivitiesPerWeek?: number; minActivitiesPerWeek?: number
+  minTotalKmMale?: number; minTotalKmFemale?: number
   minKmPerActivity?: number; maxKmPerActivity?: number; minPaceSeconds?: number; maxPaceSeconds?: number
   _count?: { teams: number }
 }
@@ -17,6 +18,7 @@ const defaultForm = {
   name: '', description: '', startDate: '', endDate: '', stravaClubId: '',
   maxActivitiesPerDay: '', minActivitiesPerDay: '',
   maxActivitiesPerWeek: '', minActivitiesPerWeek: '',
+  minTotalKmMale: '', minTotalKmFemale: '',
   minKmPerActivity: '', maxKmPerActivity: '', minPaceStr: '', maxPaceStr: '',
 }
 
@@ -72,6 +74,8 @@ export default function AdminChallengesPage() {
       minActivitiesPerDay: c.minActivitiesPerDay?.toString() || '',
       maxActivitiesPerWeek: c.maxActivitiesPerWeek?.toString() || '',
       minActivitiesPerWeek: c.minActivitiesPerWeek?.toString() || '',
+      minTotalKmMale: c.minTotalKmMale?.toString() || '',
+      minTotalKmFemale: c.minTotalKmFemale?.toString() || '',
       minKmPerActivity: c.minKmPerActivity?.toString() || '',
       maxKmPerActivity: c.maxKmPerActivity?.toString() || '',
       minPaceStr: secondsToPace(c.minPaceSeconds),
@@ -170,6 +174,14 @@ export default function AdminChallengesPage() {
                 <input className="input" type="number" min="0" placeholder="--" {...f('maxActivitiesPerWeek')} />
               </div>
               <div>
+                <label className="label">Min tổng km Nam</label>
+                <input className="input" type="number" step="0.1" min="0" placeholder="--" {...f('minTotalKmMale')} />
+              </div>
+              <div>
+                <label className="label">Min tổng km Nữ</label>
+                <input className="input" type="number" step="0.1" min="0" placeholder="--" {...f('minTotalKmFemale')} />
+              </div>
+              <div>
                 <label className="label">Min km/hoạt động</label>
                 <input className="input" type="number" step="0.1" min="0" placeholder="--" {...f('minKmPerActivity')} />
               </div>
@@ -225,6 +237,8 @@ export default function AdminChallengesPage() {
                 {[
                   ['Min km/act', c.minKmPerActivity ? `${c.minKmPerActivity} km` : '--'],
                   ['Max km/act', c.maxKmPerActivity ? `${c.maxKmPerActivity} km` : '--'],
+                  ['Min tổng km Nam', c.minTotalKmMale ? `${c.minTotalKmMale} km` : '--'],
+                  ['Min tổng km Nữ', c.minTotalKmFemale ? `${c.minTotalKmFemale} km` : '--'],
                   ['Pace nhanh nhất', c.minPaceSeconds ? `${secondsToPace(c.minPaceSeconds)}/km` : '--'],
                   ['Pace chậm nhất', c.maxPaceSeconds ? `${secondsToPace(c.maxPaceSeconds)}/km` : '--'],
                   ['Act/ngày', c.minActivitiesPerDay || c.maxActivitiesPerDay ? `${c.minActivitiesPerDay || 0}-${c.maxActivitiesPerDay || '∞'}` : '--'],
