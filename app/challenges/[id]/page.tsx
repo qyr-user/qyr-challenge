@@ -67,7 +67,7 @@ export default async function ChallengePage({ params }: { params: { id: string }
                 </span>
               </div>
               <h1 className="font-display text-4xl tracking-wider text-orange-400 mb-2">{challenge.name}</h1>
-              {challenge.description && <p className="text-zinc-400 text-sm max-w-lg">{challenge.description}</p>}
+              {challenge.description && <p className="text-zinc-400 text-sm max-w-lg whitespace-pre-line">{challenge.description}</p>}
             </div>
 
             <div className="flex flex-col gap-2 text-sm text-zinc-400 shrink-0">

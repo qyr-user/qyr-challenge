@@ -86,7 +86,7 @@ export default async function Home() {
                   </div>
 
                   <h3 className="text-lg font-bold mb-1 group-hover:text-orange-400 transition-colors">{c.name}</h3>
-                  {c.description && <p className="text-zinc-500 text-sm mb-4 line-clamp-2">{c.description}</p>}
+                  {c.description && <p className="text-zinc-500 text-sm mb-4 whitespace-pre-line">{c.description}</p>}
 
                   <div className="space-y-2 text-sm text-zinc-400">
                     <div className="flex items-center gap-2">
