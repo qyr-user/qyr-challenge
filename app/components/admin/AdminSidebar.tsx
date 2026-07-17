@@ -32,7 +32,7 @@ export function AdminSidebar() {
         <Link href="/" className="flex items-center gap-2">
           <Image src="/logo.png" alt="Club Logo" width={32} height={32} className="rounded-lg" />
           <span className="font-display text-lg tracking-wider">
-            QuảngYên<span className="text-orange-500">Runner</span>
+            QuangYen<span className="text-orange-500">Runner</span>
           </span>
         </Link>
         <p className="text-xs text-zinc-600 mt-1 ml-9">Admin Panel</p>
