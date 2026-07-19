@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react'
 import { UserX, Search, Users, Plus, Trash2, Pencil, CheckCircle2, XCircle } from 'lucide-react'
 import { toast } from 'sonner'
-import { getInitials } from '@/app/lib/utils'
+import { getInitials, todayVN } from '@/app/lib/utils'
 
 interface Athlete {
   id: number; name: string; gender: 'MALE' | 'FEMALE'
@@ -37,7 +37,7 @@ export default function AdminMembersPage() {
     athleteId: 0,
     athleteName: '',
     challengeId: 0,
-    activityDate: new Date().toISOString().slice(0, 10),
+    activityDate: todayVN(),
     name: '',
     distanceKm: '',
     movingTime: '',
@@ -195,7 +195,7 @@ export default function AdminMembersPage() {
       athleteId: athlete.id,
       athleteName: athlete.name,
       challengeId: Number(selectedChallenge),
-      activityDate: new Date().toISOString().slice(0, 10),
+      activityDate: todayVN(),
       name: '',
       distanceKm: '',
       movingTime: '',
@@ -237,7 +237,7 @@ export default function AdminMembersPage() {
         athleteId: 0,
         athleteName: '',
         challengeId: 0,
-        activityDate: new Date().toISOString().slice(0, 10),
+        activityDate: todayVN(),
         name: '',
         distanceKm: '',
         movingTime: '',

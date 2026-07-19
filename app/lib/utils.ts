@@ -34,13 +34,20 @@ export function formatDuration(seconds: number): string {
   return `${m}:${s.toString().padStart(2, '0')}`
 }
 
+const VN_TZ = 'Asia/Ho_Chi_Minh'
+
 export function formatDate(date: Date | string): string {
-  return new Date(date).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })
+  return new Date(date).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: VN_TZ })
 }
 
 export function formatDateTime(date: Date | string): string {
   return new Date(date).toLocaleString('vi-VN', {
-    day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit',
+    day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: VN_TZ,
   })
+}
+
+/** Returns today's date as YYYY-MM-DD string in Vietnam timezone (UTC+7) */
+export function todayVN(): string {
+  return new Date().toLocaleDateString('sv-SE', { timeZone: VN_TZ })
 }
 

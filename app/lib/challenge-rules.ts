@@ -46,7 +46,7 @@ function endOfWeek(d: Date): Date {
 }
 
 function fmtDate(d: Date): string {
-  return d.toISOString().slice(0, 10)
+  return d.toLocaleDateString('sv-SE', { timeZone: 'Asia/Ho_Chi_Minh' })
 }
 
 export function calculatePaceSeconds(distanceKm: number, movingTimeSeconds: number): number | null {
