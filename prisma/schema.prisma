@@ -118,5 +118,5 @@ model Activity {
   athlete   Athlete   @relation(fields: [athleteId], references: [id], onDelete: Cascade)
   challenge Challenge @relation(fields: [challengeId], references: [id], onDelete: Cascade)
 
-  @@unique([athleteId, challengeId, name, activityDate])
+  @@unique([athleteId, challengeId, name, activityDate, distanceKm, movingTime, paceSeconds])
 }
