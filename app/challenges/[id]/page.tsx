@@ -37,6 +37,43 @@ async function getLeaderboard(challengeId: number) {
     .map((t, i) => ({ ...t, rank: i + 1 }))
 }
 
+async function getTopIndividuals(challengeId: number) {
+  const teamMembers = await prisma.teamMember.findMany({
+    where: { team: { challengeId } },
+    include: {
+      athlete: {
+        include: {
+          activities: {
+            where: { challengeId, isValid: true },
+            select: { distanceKm: true },
+          },
+        },
+      },
+    },
+  })
+
+  const byAthlete = new Map<number, { id: number; name: string; gender: 'MALE' | 'FEMALE'; totalKm: number }>()
+
+  for (const tm of teamMembers) {
+    const gender = (tm.athlete as { gender?: 'MALE' | 'FEMALE' }).gender ?? 'MALE'
+    if (byAthlete.has(tm.athlete.id)) continue
+
+    const totalKm = tm.athlete.activities.reduce((sum, a) => sum + a.distanceKm, 0)
+    byAthlete.set(tm.athlete.id, {
+      id: tm.athlete.id,
+      name: tm.athlete.name,
+      gender,
+      totalKm,
+    })
+  }
+
+  const all = Array.from(byAthlete.values()).sort((a, b) => b.totalKm - a.totalKm)
+  return {
+    male: all.filter(a => a.gender === 'MALE').slice(0, 3),
+    female: all.filter(a => a.gender === 'FEMALE').slice(0, 3),
+  }
+}
+
 async function getMemberStatuses(challengeId: number) {
   const challenge = await prisma.challenge.findUnique({ where: { id: challengeId } })
   if (!challenge) return []
@@ -94,6 +131,7 @@ export default async function ChallengePage({ params }: { params: { id: string }
   if (!challenge) notFound()
 
   const leaderboard = await getLeaderboard(Number(params.id))
+  const topIndividuals = await getTopIndividuals(Number(params.id))
   const memberStatuses = await getMemberStatuses(Number(params.id))
   const now = new Date()
   const isActive = now >= challenge.startDate && now <= challenge.endDate
@@ -149,6 +187,40 @@ export default async function ChallengePage({ params }: { params: { id: string }
             <Trophy className="w-5 h-5 text-orange-500" />
             <h2 className="text-xl font-bold">Bảng xếp hạng</h2>
             <span className="text-zinc-500 text-sm ml-2">(bấm vào 1 nhóm để xem chi tiết hoạt động)</span>
+          </div>
+
+          <div className="grid md:grid-cols-2 gap-4 mb-6">
+            <div className="card p-4">
+              <h3 className="font-semibold text-blue-300 mb-3">Top 3 Nam cá nhân</h3>
+              <div className="space-y-2">
+                {topIndividuals.male.length === 0 ? (
+                  <p className="text-zinc-500 text-sm">Chưa có dữ liệu.</p>
+                ) : (
+                  topIndividuals.male.map((a, idx) => (
+                    <div key={a.id} className="flex items-center justify-between text-sm">
+                      <span className="text-zinc-300">#{idx + 1} {a.name}</span>
+                      <span className="font-mono text-orange-300">{a.totalKm.toFixed(1)} km</span>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            <div className="card p-4">
+              <h3 className="font-semibold text-pink-300 mb-3">Top 3 Nữ cá nhân</h3>
+              <div className="space-y-2">
+                {topIndividuals.female.length === 0 ? (
+                  <p className="text-zinc-500 text-sm">Chưa có dữ liệu.</p>
+                ) : (
+                  topIndividuals.female.map((a, idx) => (
+                    <div key={a.id} className="flex items-center justify-between text-sm">
+                      <span className="text-zinc-300">#{idx + 1} {a.name}</span>
+                      <span className="font-mono text-orange-300">{a.totalKm.toFixed(1)} km</span>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
           </div>
 
           {leaderboard.length === 0 ? (
