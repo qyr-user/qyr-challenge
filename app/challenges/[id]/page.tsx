@@ -69,8 +69,8 @@ async function getTopIndividuals(challengeId: number) {
 
   const all = Array.from(byAthlete.values()).sort((a, b) => b.totalKm - a.totalKm)
   return {
-    male: all.filter(a => a.gender === 'MALE').slice(0, 3),
-    female: all.filter(a => a.gender === 'FEMALE').slice(0, 3),
+    male: all.filter(a => a.gender === 'MALE').slice(0, 5),
+    female: all.filter(a => a.gender === 'FEMALE').slice(0, 5),
   }
 }
 
@@ -191,8 +191,8 @@ export default async function ChallengePage({ params }: { params: { id: string }
 
           <div className="grid md:grid-cols-2 gap-4 mb-6">
             <div className="card p-4">
-              <h3 className="font-semibold text-blue-300 mb-3">Top 3 Nam cá nhân</h3>
-              <div className="space-y-2">
+              <h3 className="font-semibold text-blue-300 mb-3">Top 5 Nam cá nhân</h3>
+              <div className="space-y-2 max-h-28 overflow-y-auto pr-1">
                 {topIndividuals.male.length === 0 ? (
                   <p className="text-zinc-500 text-sm">Chưa có dữ liệu.</p>
                 ) : (
@@ -207,8 +207,8 @@ export default async function ChallengePage({ params }: { params: { id: string }
             </div>
 
             <div className="card p-4">
-              <h3 className="font-semibold text-pink-300 mb-3">Top 3 Nữ cá nhân</h3>
-              <div className="space-y-2">
+              <h3 className="font-semibold text-pink-300 mb-3">Top 5 Nữ cá nhân</h3>
+              <div className="space-y-2 max-h-28 overflow-y-auto pr-1">
                 {topIndividuals.female.length === 0 ? (
                   <p className="text-zinc-500 text-sm">Chưa có dữ liệu.</p>
                 ) : (
